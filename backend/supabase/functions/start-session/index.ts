@@ -14,13 +14,22 @@ Deno.serve(async (req) => {
       if (result.error || result.data.length !== ids.length || result.data.some((c) => !c.responder_id)) return json({ error: "All selected contacts must accept first." }, 409);
       contacts = result.data;
     }
-    const expiresAt = new Date(Date.now() + duration * 60000).toISOString();
-    const created = await auth.admin.from("safety_sessions").insert({ owner_id: auth.userId, destination: typeof body.destination === "string" ? body.destination.slice(0, 160) : null, expires_at: expiresAt }).select("id").single();
+    const startedAt = Date.now();
+    const expiresAt = new Date(startedAt + duration * 60000).toISOString();
+    const nextCheckInAt = new Date(startedAt + Math.min(15, duration) * 60000).toISOString();
+    const created = await auth.admin.from("safety_sessions").insert({
+      owner_id: auth.userId,
+      destination: typeof body.destination === "string" ? body.destination.slice(0, 160) : null,
+      expires_at: expiresAt,
+      check_in_interval_minutes: 15,
+      check_in_grace_minutes: 5,
+      next_check_in_at: nextCheckInAt,
+    }).select("id").single();
     if (created.error) return json({ error: "Could not start session." }, 500);
     if (contacts.length) {
       const link = await auth.admin.from("session_responders").insert(contacts.map((c) => ({ session_id: created.data.id, owner_id: auth.userId, responder_id: c.responder_id, contact_id: c.id })));
       if (link.error) { await auth.admin.from("safety_sessions").delete().eq("id", created.data.id); return json({ error: "Could not authorize responders." }, 500); }
     }
-    return json({ sessionId: created.data.id, expiresAt });
+    return json({ sessionId: created.data.id, expiresAt, nextCheckInAt });
   } catch { return json({ error: "Invalid request." }, 400); }
 });

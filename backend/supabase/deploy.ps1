@@ -9,7 +9,9 @@ $Functions = @(
   "update-location",
   "create-sos",
   "end-session",
-  "revoke-contact"
+  "revoke-contact",
+  "check-in",
+  "process-missed-checkins"
 )
 
 Push-Location $PSScriptRoot
@@ -46,8 +48,8 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Database migration push failed." }
 
   if ($DeployFunctions) {
-    Write-Host "The seven functions already deployed for this project matched local source at the last audit."
-    $functionConfirmation = Read-Host "Type DEPLOY-FUNCTIONS to redeploy all seven functions anyway"
+    Write-Host "This deploys all nine local functions, including the scheduled missed-check-in processor."
+    $functionConfirmation = Read-Host "Type DEPLOY-FUNCTIONS to deploy all nine functions"
     if ($functionConfirmation -ceq "DEPLOY-FUNCTIONS") {
       foreach ($FunctionName in $Functions) {
         npx --yes supabase@latest functions deploy $FunctionName --project-ref $ProjectRef --use-api

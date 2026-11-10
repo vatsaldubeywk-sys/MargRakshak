@@ -66,9 +66,9 @@
                 </Grid>
             </Border>
 
-            <Button x:Name="CheckInButton" Text="I am okay · local only" Clicked="OnCheckInClicked" IsEnabled="False" BackgroundColor="#E2F1EC" TextColor="#126B5A" FontAttributes="Bold" CornerRadius="14" HeightRequest="50" />
+            <Button x:Name="CheckInButton" Text="I am okay · check in" Clicked="OnCheckInClicked" IsEnabled="False" BackgroundColor="#E2F1EC" TextColor="#126B5A" FontAttributes="Bold" CornerRadius="14" HeightRequest="50" />
             <Button x:Name="SosButton" Text="SOS  ·  I need help" Clicked="OnSosClicked" BackgroundColor="#B83D3D" TextColor="White" FontSize="17" FontAttributes="Bold" CornerRadius="16" HeightRequest="58" />
-            <Label Text="SOS is recorded and may trigger email alerts if the provider is configured. Email acceptance does not confirm delivery. Call 112 for emergency help." FontSize="11" TextColor="#7D898D" HorizontalTextAlignment="Center" />
+            <Label Text="A missed check-in or SOS may trigger email alerts when configured. Email acceptance does not confirm delivery. Call 112 for emergency help." FontSize="11" TextColor="#7D898D" HorizontalTextAlignment="Center" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

@@ -1,13 +1,13 @@
 # Marg Rakshak Supabase backend
 
-The Android-first application is a .NET MAUI app written in C#. Supabase Auth and seven authenticated Edge Functions back the app. The service-role key stays server-side; only the project URL and publishable key are configured in the app.
+The Android-first application is a .NET MAUI app written in C#. Supabase Auth and nine Edge Functions back the app. The mobile app uses only the project URL and publishable key; secret API keys stay server-side.
 
 ## Current deployment status
 
 - Project: `mhdnpgzfpnthrrzuooek` (Mumbai / South Asia, Free plan).
 - Migration `20261110000000_initial_schema.sql` is applied remotely and recorded in migration history.
-- All seven Edge Functions are ACTIVE.
-- `create-contact` and `create-sos` now have local Resend email integration, but those local updates are not deployed yet. The other five deployed functions matched their local source at the last audit.
+- The seven existing Edge Functions are ACTIVE. Local email and check-in changes, a new database migration, and two new Edge Functions are not deployed yet.
+- Local session code requires the user to check in every 15 minutes; after a five-minute grace period, the scheduled processor attempts email to session contacts. This behavior is not live in Supabase until the migration, functions, email secrets, and Cron job are configured.
 - The Android app builds; a debug APK is produced under `SafePath/bin/Debug/net10.0-android/publish/`.
 - `viewer/index.html` exists locally but is not hosted yet.
 
@@ -19,6 +19,8 @@ The Android-first application is a .NET MAUI app written in C#. Supabase Auth an
 - `start-session`: creates a session and authorizes only accepted responders.
 - `update-location`: validates and stores idempotent location samples for an active session.
 - `create-sos`: records an idempotent SOS event and attempts email alerts to the accepted responders for the session when the mail provider is configured.
+- `check-in`: records a check-in transactionally and resets the next due time.
+- `process-missed-checkins`: a secret-key-protected scheduled function that claims overdue sessions and sends idempotent email alerts.
 - `end-session`: ends sharing; RLS stops responders from reading the session.
 
 RLS permits authenticated owners and currently authorized responders to read session data. Client writes are revoked; mutations go through authenticated functions. The Firebase scaffold under `backend/functions` is legacy and is not the active backend design.
@@ -32,15 +34,53 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 - `RESEND_API_KEY`: the Resend sending API key.
 - `RESEND_FROM_EMAIL`: a sender on the verified domain, for example `Marg Rakshak <alerts@your-verified-domain>`.
 
-Never put either value in the mobile app, source files, or chat. After both secrets are configured, run `.\deploy-email.ps1` from this folder and type `DEPLOY-EMAIL` when asked. It deploys only `create-contact` and `create-sos` using Supabase API bundling (Docker is not required).
+Never put either value in the mobile app, source files, or chat. Apply the new migration first with `.\deploy.ps1`, then add both secrets in **Supabase Dashboard → Edge Functions → Secrets** and run `.\deploy-email.ps1`. Confirm with `DEPLOY-EMAIL`. It deploys the email-enabled contact/SOS functions plus session/check-in processing using Supabase API bundling (Docker is not required).
 
-The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. No server-side missed-check-in timer, email delivery webhook/receipt, responder acknowledgement, push notification, or emergency dispatch is configured yet. For emergencies in India, call 112.
+The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. The Android phone reminder appears at the scheduled check-in time when notification permission is allowed. The server-side missed-check-in timer becomes active only after applying the migration, deploying the functions, configuring email secrets, and scheduling the Cron job below. No email delivery receipt, responder acknowledgement, remote push notification, or emergency dispatch is configured. For emergencies in India, call 112.
+
+## Schedule missed-check-in processing
+
+The server processor must run every minute. Enable `pg_cron`, `pg_net`, and `supabase_vault` in **Database → Extensions**. In the SQL Editor, store the project URL and a server-only Supabase Secret API key (or legacy service-role key) in Vault, then schedule the request below. Do not use the mobile publishable key. The key is placed in the `apikey` request header and is never embedded in the app or migration.
+
+```sql
+select vault.create_secret('https://mhdnpgzfpnthrrzuooek.supabase.co', 'marg_rakshak_project_url');
+select vault.create_secret('PASTE_SERVER_SECRET_KEY_HERE', 'marg_rakshak_cron_api_key');
+
+select cron.schedule(
+  'marg-rakshak-missed-checkins',
+  '* * * * *',
+  $$
+    select net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'marg_rakshak_project_url') || '/functions/v1/process-missed-checkins',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'marg_rakshak_cron_api_key')
+      ),
+      body := '{}'::jsonb,
+      timeout_milliseconds := 10000
+    );
+  $$
+);
+
+select jobname, schedule, active from cron.job where jobname = 'marg-rakshak-missed-checkins';
+
+-- Inspect recent runs:
+select start_time, end_time, status, return_message
+from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'marg-rakshak-missed-checkins')
+order by start_time desc limit 10;
+
+-- Stop the job later:
+-- select cron.unschedule('marg-rakshak-missed-checkins');
+```
+
+Run `vault.create_secret` once per name. Review Cron run history and Edge Function logs after enabling it. Cron invokes the function every minute, so a late-check-in email may be attempted about five to six minutes after its due time. The alert is an attempt to contact trusted people; it cannot verify delivery or confirm that help is coming.
 
 ## Deploy a future database migration
 
 The CLI must be signed in first (`npx --yes supabase@latest login`). Run `.\deploy.ps1` from this folder. When prompted, paste the full Session pooler URI from **Supabase Dashboard → MargRakshak → Connect → Session pooler**, replacing `[YOUR-PASSWORD]` locally. The password is hidden at the prompt. The script previews migrations and asks for exact uppercase `APPLY` before changing the database. It uses the IPv4-compatible Mumbai pooler; it does not require `supabase link`.
 
-Function deployment is skipped by default in `deploy.ps1`. Use `-DeployFunctions` only when you intentionally need to redeploy all seven functions; it asks for `DEPLOY-FUNCTIONS` separately.
+Function deployment is skipped by default in `deploy.ps1`. Use `-DeployFunctions` only when you intentionally need to deploy all nine local functions; it asks for `DEPLOY-FUNCTIONS` separately.
 
 ## Responder viewer
 

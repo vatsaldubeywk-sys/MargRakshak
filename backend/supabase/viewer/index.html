@@ -55,7 +55,7 @@
       const last = session.last_location_at ? new Date(session.last_location_at) : null;
       const age = last ? Math.max(0, Math.floor((Date.now() - last.getTime()) / 1000)) : null;
       const isStale = age === null || age > 60;
-      const status = isStale ? 'STALE LOCATION' : (session.status === 'alert' ? 'SOS RECORDED' : 'SESSION ACTIVE');
+      const status = session.status === 'alert' ? 'ATTENTION NEEDED' : (isStale ? 'STALE LOCATION' : 'SESSION ACTIVE');
       const point = Number.isFinite(session.last_latitude) && Number.isFinite(session.last_longitude);
       const map = point ? `<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${session.last_latitude}&mlon=${session.last_longitude}#map=16/${session.last_latitude}/${session.last_longitude}">Open last location in map</a>` : 'No location sample received';
       const card = document.createElement('article'); card.className = 'session';

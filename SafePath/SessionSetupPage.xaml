@@ -13,8 +13,8 @@
     </CollectionView>
     <Border Padding="15" BackgroundColor="White" Stroke="#E2EAE8" StrokeShape="RoundRectangle 16"><VerticalStackLayout Spacing="10">
       <Label Text="Before you start" FontSize="16" FontAttributes="Bold" TextColor="#172B36" />
-      <Label Text="Your location is sent to your private account. Selected accepted contacts can view it while the session is active. Starting a session does not send contact alerts. Manual SOS email requires provider setup and cannot confirm delivery. This app does not dispatch emergency services." FontSize="13" TextColor="#647780" />
-      <HorizontalStackLayout Spacing="10"><CheckBox x:Name="ConsentCheckBox" Color="#147D68" /><Label Text="I agree to share my location for this session and understand contact alerts are not guaranteed." FontSize="13" TextColor="#263B44" VerticalOptions="Center" /></HorizontalStackLayout>
+      <Label Text="Your location is sent to your private account. Selected accepted contacts can view it while the session is active. Check in every 15 minutes. Allow notification permission to receive an on-time phone reminder. If you are 5 minutes late, the server may email selected contacts with your latest location when email is configured. Email is not guaranteed, and this app does not dispatch emergency services." FontSize="13" TextColor="#647780" />
+      <HorizontalStackLayout Spacing="10"><CheckBox x:Name="ConsentCheckBox" Color="#147D68" /><Label Text="I agree to share my location, make timed check-ins, and understand a late check-in may trigger an email alert." FontSize="13" TextColor="#263B44" VerticalOptions="Center" /></HorizontalStackLayout>
     </VerticalStackLayout></Border>
     <Button Text="Start safety session" Clicked="OnStartClicked" BackgroundColor="#147D68" TextColor="White" FontAttributes="Bold" CornerRadius="14" HeightRequest="54" />
   </VerticalStackLayout></ScrollView>

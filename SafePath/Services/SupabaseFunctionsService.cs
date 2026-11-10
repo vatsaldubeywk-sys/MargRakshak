@@ -30,11 +30,26 @@ public sealed class SupabaseFunctionsService(SupabaseAuthService auth, HttpClien
     public Task<StartSessionResult> StartSessionAsync(int durationMinutes, IReadOnlyList<string> contactIds, string? destination, CancellationToken cancellationToken = default)
         => InvokeAsync<StartSessionRequest, StartSessionResult>("start-session", new(durationMinutes, contactIds, destination), cancellationToken);
 
+    public async Task<ActiveSessionDto?> GetSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        var token = await auth.GetAccessTokenAsync(cancellationToken);
+        var id = Uri.EscapeDataString(sessionId);
+        using var request = auth.CreateRequest(HttpMethod.Get,
+            $"rest/v1/safety_sessions?select=id,status,expires_at,next_check_in_at,destination&id=eq.{id}&limit=1", token);
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode) await SupabaseAuthService.ThrowApiErrorAsync(response, cancellationToken);
+        var rows = await response.Content.ReadFromJsonAsync<List<ActiveSessionDto>>(JsonOptions, cancellationToken) ?? [];
+        return rows.FirstOrDefault();
+    }
+
     public Task<SimpleStatusResult> UpdateLocationAsync(string sessionId, string sampleKey, double latitude, double longitude, double accuracyM, CancellationToken cancellationToken = default)
         => InvokeAsync<UpdateLocationRequest, SimpleStatusResult>("update-location", new(sessionId, sampleKey, latitude, longitude, accuracyM), cancellationToken);
 
     public Task<CreateSosResult> CreateSosAsync(string sessionId, string eventKey, CancellationToken cancellationToken = default)
         => InvokeAsync<CreateSosRequest, CreateSosResult>("create-sos", new(sessionId, eventKey), cancellationToken);
+
+    public Task<CheckInResult> CheckInAsync(string sessionId, string eventKey, CancellationToken cancellationToken = default)
+        => InvokeAsync<CheckInRequest, CheckInResult>("check-in", new(sessionId, eventKey), cancellationToken);
 
     public Task<SimpleStatusResult> EndSessionAsync(string sessionId, CancellationToken cancellationToken = default)
         => InvokeAsync<EndSessionRequest, SimpleStatusResult>("end-session", new(sessionId), cancellationToken);
@@ -57,11 +72,14 @@ public sealed record AcceptContactRequest([property: JsonPropertyName("contactId
 public sealed record StartSessionRequest([property: JsonPropertyName("durationMinutes")] int DurationMinutes, [property: JsonPropertyName("contactIds")] IReadOnlyList<string> ContactIds, [property: JsonPropertyName("destination")] string? Destination);
 public sealed record UpdateLocationRequest([property: JsonPropertyName("sessionId")] string SessionId, [property: JsonPropertyName("sampleKey")] string SampleKey, [property: JsonPropertyName("latitude")] double Latitude, [property: JsonPropertyName("longitude")] double Longitude, [property: JsonPropertyName("accuracyM")] double AccuracyM);
 public sealed record CreateSosRequest([property: JsonPropertyName("sessionId")] string SessionId, [property: JsonPropertyName("eventKey")] string EventKey);
+public sealed record CheckInRequest([property: JsonPropertyName("sessionId")] string SessionId, [property: JsonPropertyName("eventKey")] string EventKey);
 public sealed record EndSessionRequest([property: JsonPropertyName("sessionId")] string SessionId);
 public sealed class TrustedContactDto { [JsonPropertyName("id")] public string Id { get; init; } = ""; [JsonPropertyName("display_name")] public string DisplayName { get; init; } = ""; [JsonPropertyName("invited_email")] public string InvitedEmail { get; init; } = ""; [JsonPropertyName("status")] public string Status { get; init; } = ""; }
 public sealed class CreateContactResult { public string? ContactId { get; init; } public string? Status { get; init; } public bool InvitationSent { get; init; } public string? InvitationStatus { get; init; } }
-public sealed class StartSessionResult { public string? SessionId { get; init; } public DateTimeOffset ExpiresAt { get; init; } }
+public sealed class StartSessionResult { public string? SessionId { get; init; } public DateTimeOffset ExpiresAt { get; init; } public DateTimeOffset? NextCheckInAt { get; init; } }
+public sealed class ActiveSessionDto { [JsonPropertyName("id")] public string Id { get; init; } = ""; [JsonPropertyName("status")] public string Status { get; init; } = ""; [JsonPropertyName("expires_at")] public DateTimeOffset ExpiresAt { get; init; } [JsonPropertyName("next_check_in_at")] public DateTimeOffset? NextCheckInAt { get; init; } [JsonPropertyName("destination")] public string? Destination { get; init; } }
 public sealed class CreateSosResult { public bool Recorded { get; init; } public int EmailsAccepted { get; init; } public int EmailsAttempted { get; init; } public string? NotificationStatus { get; init; } public bool DeliveryConfirmed { get; init; } }
+public sealed class CheckInResult { public bool Success { get; init; } public bool Duplicate { get; init; } public string? Status { get; init; } public DateTimeOffset? NextCheckInAt { get; init; } }
 public sealed class SimpleStatusResult { public string? Status { get; init; } public bool Accepted { get; init; } public bool Duplicate { get; init; } }
 
 

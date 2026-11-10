@@ -11,8 +11,13 @@ public partial class MainPage : ContentPage
     private bool _locationBusy;
     private string? _sessionId;
     private string? _sosEventKey;
+    private DateTimeOffset? _nextCheckInAt;
+    private DateTimeOffset? _sessionExpiresAt;
     private bool _sosBusy;
+    private bool _restoringSession;
+    private bool _localReminderEnabled;
     private CancellationTokenSource? _sessionExpiry;
+    private const string ActiveSessionPreference = "marg_rakshak_active_session_id";
 
     public MainPage()
     {
@@ -27,6 +32,7 @@ public partial class MainPage : ContentPage
         base.OnAppearing();
         try { await _auth.GetAccessTokenAsync(); AccountButton.Text = "Account"; }
         catch { AccountButton.Text = "Sign in"; }
+        await RestoreSessionAsync();
     }
 
     public void SetAccountStatus(string? email) => AccountButton.Text = string.IsNullOrWhiteSpace(email) ? "Sign in" : $"Signed in · {email}";
@@ -43,6 +49,9 @@ public partial class MainPage : ContentPage
             try { if (_sessionId is not null) await _api.EndSessionAsync(_sessionId); }
             catch (Exception ex) { await DisplayAlertAsync("Session ended locally", $"The phone stopped tracking, but server closure could not be confirmed: {ex.Message}", "OK"); }
             _sessionId = null;
+            _nextCheckInAt = null;
+            _sessionExpiresAt = null;
+            Preferences.Default.Remove(ActiveSessionPreference);
             CheckInButton.IsEnabled = false;
             CheckInStatusLabel.Text = "No active session";
             LocationStatusLabel.Text = "Not checked";
@@ -75,6 +84,11 @@ public partial class MainPage : ContentPage
                 await DisplayAlertAsync("Location permission needed", "Allow location while using the app to start this session.", "OK");
                 return;
             }
+#if ANDROID
+            _localReminderEnabled = await Permissions.RequestAsync<Permissions.PostNotifications>() == PermissionStatus.Granted;
+            if (!_localReminderEnabled)
+                await DisplayAlertAsync("Check-in reminders are off", "You can still start the session, but this phone will not show an on-time check-in reminder. The server alert also requires the backend setup to be completed.", "Continue");
+#endif
             var location = await Geolocation.GetLocationAsync(new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(10)));
             if (location is null)
             {
@@ -86,18 +100,22 @@ public partial class MainPage : ContentPage
             var created = await _api.StartSessionAsync(minutes, contactIds, destination);
             if (string.IsNullOrWhiteSpace(created.SessionId)) throw new InvalidOperationException("The server did not return a session ID.");
             _sessionId = created.SessionId;
+            Preferences.Default.Set(ActiveSessionPreference, _sessionId);
+            _nextCheckInAt = created.NextCheckInAt;
+            _sessionExpiresAt = created.ExpiresAt;
             _sosEventKey = Guid.NewGuid().ToString();
             await _api.UpdateLocationAsync(_sessionId, Guid.NewGuid().ToString(), location.Latitude, location.Longitude, location.Accuracy ?? 0);
-            StartBackgroundLocation(minutes);
+            StartBackgroundLocation(minutes, _nextCheckInAt, created.ExpiresAt);
             _sessionActive = true;
             _sessionExpiry?.Cancel();
             _sessionExpiry = new CancellationTokenSource();
-            _ = EndSessionWhenExpiredAsync(minutes, _sessionExpiry.Token);
+            _ = EndSessionWhenExpiredAsync(TimeSpan.FromMinutes(minutes), _sessionExpiry.Token);
             CheckInButton.IsEnabled = true;
-            CheckInStatusLabel.Text = $"Duration: {minutes} minutes";
+            CheckInStatusLabel.Text = FormatCheckInStatus(_nextCheckInAt);
             LocationStatusLabel.Text = $"Fresh · ±{Math.Round(location.Accuracy ?? 0)} m";
             var destinationText = string.IsNullOrWhiteSpace(destination) ? "" : $" Destination: {destination}.";
-            SetSessionState("CLOUD SESSION", "Session is active", $"Location is being sent to your Supabase session. Selected responders can view it. Manual SOS email requires provider setup and does not confirm delivery.{destinationText}", "End safety session");
+            var reminderText = _localReminderEnabled ? "A phone reminder will appear when each check-in is due." : "This phone has no check-in reminder enabled.";
+            SetSessionState("CLOUD SESSION", "Session is active", $"Location is being sent to your Supabase session. Check in every 15 minutes. {reminderText} Selected contacts may receive an email if you are 5 minutes late; email delivery is not confirmed.{destinationText}", "End safety session");
         }
         catch (FeatureNotEnabledException)
         {
@@ -115,6 +133,7 @@ public partial class MainPage : ContentPage
             {
                 try { await _api.EndSessionAsync(_sessionId); } catch { }
                 _sessionId = null;
+                Preferences.Default.Remove(ActiveSessionPreference);
             }
             StopBackgroundLocation();
             LocationStatusLabel.Text = "Session not started";
@@ -128,7 +147,6 @@ public partial class MainPage : ContentPage
         }
     }
 
-#if ANDROID
 #if ANDROID
     private async void OnBackgroundLocationChanged(Android.Locations.Location location)
     {
@@ -146,49 +164,114 @@ public partial class MainPage : ContentPage
 
 #endif
 
-#endif
-
     private void SetSessionState(string status, string headline, string description, string buttonText)
     {
+        var attention = status == "ATTENTION NEEDED";
         SharingFootnoteLabel.Text = _sessionActive ? "Location sharing is active for this session." : "Location is not being shared.";
         StatusLabel.Text = status;
-        StatusLabel.TextColor = _sessionActive ? Color.FromArgb("#126B5A") : Color.FromArgb("#647780");
-        StatusPill.BackgroundColor = _sessionActive ? Color.FromArgb("#E2F1EC") : Color.FromArgb("#EEF2F2");
+        StatusLabel.TextColor = attention ? Color.FromArgb("#865917") : _sessionActive ? Color.FromArgb("#126B5A") : Color.FromArgb("#647780");
+        StatusPill.BackgroundColor = attention ? Color.FromArgb("#FFF1D8") : _sessionActive ? Color.FromArgb("#E2F1EC") : Color.FromArgb("#EEF2F2");
         SessionHeadline.Text = headline;
         SessionDescription.Text = description;
         SessionButton.Text = buttonText;
         SemanticScreenReader.Announce(headline);
     }
 
-    private async Task EndSessionWhenExpiredAsync(int minutes, CancellationToken cancellationToken)
+    private async Task RestoreSessionAsync()
+    {
+        if (_sessionActive || _restoringSession) return;
+        var savedSessionId = Preferences.Default.Get<string?>(ActiveSessionPreference, null);
+        if (string.IsNullOrWhiteSpace(savedSessionId)) return;
+
+        _restoringSession = true;
+        try
+        {
+#if ANDROID
+            _localReminderEnabled = await Permissions.CheckStatusAsync<Permissions.PostNotifications>() == PermissionStatus.Granted;
+#endif
+            var session = await _api.GetSessionAsync(savedSessionId);
+            if (session is null || session.Status is not ("active" or "alert") || session.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                Preferences.Default.Remove(ActiveSessionPreference);
+                CheckInButton.IsEnabled = false;
+                CheckInStatusLabel.Text = "No active session";
+                return;
+            }
+
+            var remaining = session.ExpiresAt - DateTimeOffset.UtcNow;
+            _sessionId = session.Id;
+            _nextCheckInAt = session.NextCheckInAt;
+            _sessionExpiresAt = session.ExpiresAt;
+            _sosEventKey = Guid.NewGuid().ToString();
+            _sessionActive = true;
+            CheckInButton.IsEnabled = true;
+            var alertActive = session.Status == "alert";
+            CheckInStatusLabel.Text = alertActive ? "Alert active · check in now" : FormatCheckInStatus(_nextCheckInAt);
+            LocationStatusLabel.Text = "Session restored · checking location";
+            var destinationText = string.IsNullOrWhiteSpace(session.Destination) ? "" : $" Destination: {session.Destination}.";
+            var headline = alertActive ? "Session needs attention" : "Session is active";
+            var description = alertActive
+                ? $"The session has an active alert. If you are safe, check in now. Contacts may have received an email; delivery is not confirmed.{destinationText}"
+                : $"Location sharing continues. Check in every 15 minutes. {(_localReminderEnabled ? "A phone reminder will appear when due." : "No phone reminder is enabled.")} Selected contacts may receive an email if you are 5 minutes late; email delivery is not confirmed.{destinationText}";
+            SetSessionState(alertActive ? "ATTENTION NEEDED" : "CLOUD SESSION", headline, description, "End safety session");
+            StartBackgroundLocation(Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes)), _nextCheckInAt, session.ExpiresAt);
+            _sessionExpiry?.Cancel();
+            _sessionExpiry = new CancellationTokenSource();
+            _ = EndSessionWhenExpiredAsync(remaining, _sessionExpiry.Token);
+        }
+        catch (Exception ex)
+        {
+            LocationStatusLabel.Text = "Could not reconnect to session";
+            CheckInStatusLabel.Text = "Session status unavailable";
+            await DisplayAlertAsync("Session not confirmed", $"The saved session could not be checked with Supabase. Retry when you have a connection. {ex.Message}", "OK");
+        }
+        finally
+        {
+            _restoringSession = false;
+        }
+    }
+
+    private async Task EndSessionWhenExpiredAsync(TimeSpan remaining, CancellationToken cancellationToken)
     {
         try
         {
-            await Task.Delay(TimeSpan.FromMinutes(minutes), cancellationToken);
+            await Task.Delay(remaining, cancellationToken);
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 if (!_sessionActive) return;
                 _sessionExpiry?.Cancel();
-            _sessionActive = false;
+                _sessionActive = false;
                 StopBackgroundLocation();
                 try { if (_sessionId is not null) await _api.EndSessionAsync(_sessionId); } catch { }
                 _sessionId = null;
+                _nextCheckInAt = null;
+                _sessionExpiresAt = null;
+                Preferences.Default.Remove(ActiveSessionPreference);
                 CheckInButton.IsEnabled = false;
                 CheckInStatusLabel.Text = "Session expired";
-                SetSessionState("SESSION ENDED", "Session time is up", "Location tracking has stopped. No contact alerts were sent.", "Start safety session");
+                SetSessionState("SESSION ENDED", "Session time is up", "Location tracking has stopped. A contact email may have been attempted if a check-in was overdue.", "Start safety session");
                 await DisplayAlertAsync("Session ended", "The selected session duration is over and location tracking has stopped.", "OK");
             });
         }
         catch (OperationCanceledException) { }
     }
 
-    private static void StartBackgroundLocation(int durationMinutes)
+    private string FormatCheckInStatus(DateTimeOffset? due)
+    {
+        var schedule = due is { } next ? $"Check in by {next.ToLocalTime():t} · every 15 min" : "Check in every 15 minutes";
+        return _localReminderEnabled ? $"{schedule} · phone reminder on" : $"{schedule} · phone reminder off";
+    }
+
+    private static void StartBackgroundLocation(int durationMinutes, DateTimeOffset? nextCheckInAt, DateTimeOffset expiresAt)
     {
 #if ANDROID
         var context = Android.App.Application.Context;
         var intent = new Android.Content.Intent(context, typeof(SafetyLocationService));
         intent.SetAction(SafetyLocationService.ActionStart);
         intent.PutExtra("durationMinutes", durationMinutes);
+        var next = nextCheckInAt ?? DateTimeOffset.UtcNow.AddMinutes(15);
+        intent.PutExtra("nextCheckInAtUtcTicks", next.UtcDateTime.Ticks);
+        intent.PutExtra("expiresAtUtcTicks", expiresAt.UtcDateTime.Ticks);
         if (OperatingSystem.IsAndroidVersionAtLeast(26)) context.StartForegroundService(intent);
         else context.StartService(intent);
 #endif
@@ -206,7 +289,33 @@ public partial class MainPage : ContentPage
 
     private async void OnCheckInClicked(object? sender, EventArgs e)
     {
-        if (_sessionActive) await DisplayAlertAsync("Local check-in only", "This prototype does not save your check-in or start an automatic no-response timer.", "OK");
+        if (!_sessionActive || _sessionId is null) return;
+        CheckInButton.IsEnabled = false;
+        try
+        {
+            var result = await _api.CheckInAsync(_sessionId, Guid.NewGuid().ToString());
+            if (!result.Success) throw new InvalidOperationException("The server did not accept this check-in.");
+            _nextCheckInAt = result.NextCheckInAt;
+            if (_sessionExpiresAt is { } expiry)
+                StartBackgroundLocation(Math.Max(1, (int)Math.Ceiling((expiry - DateTimeOffset.UtcNow).TotalMinutes)), _nextCheckInAt, expiry);
+            CheckInStatusLabel.Text = _nextCheckInAt is { } due
+                ? $"Checked in · next by {due.ToLocalTime():t}" + (_localReminderEnabled ? " · reminder on" : " · reminder off")
+                : "Check-in recorded";
+            if (result.Status == "alert")
+                SetSessionState("ATTENTION NEEDED", "Session alert remains active", "Your check-in was recorded, but an earlier SOS alert remains active. Contacts may already have received an email; delivery is not confirmed.", "End safety session");
+            else
+                SetSessionState("CLOUD SESSION", "Session is active", "Your check-in was recorded. If you were overdue, a contact email may already have been attempted; delivery is not confirmed.", "End safety session");
+            SemanticScreenReader.Announce("Check-in recorded");
+        }
+        catch (Exception ex)
+        {
+            CheckInStatusLabel.Text = "Check-in could not be confirmed";
+            await DisplayAlertAsync("Check-in not confirmed", $"The server could not confirm your check-in. Please retry while the session is active. {ex.Message}", "OK");
+        }
+        finally
+        {
+            CheckInButton.IsEnabled = _sessionActive;
+        }
     }
 
     private async void OnSosClicked(object? sender, EventArgs e)
@@ -224,6 +333,8 @@ public partial class MainPage : ContentPage
                     _sosEventKey ??= Guid.NewGuid().ToString();
                     var result = await _api.CreateSosAsync(_sessionId, _sosEventKey);
                     status = !result.Recorded ? "The SOS event could not be confirmed." : result.EmailsAccepted > 0 ? $"SOS recorded. The email provider accepted alerts for {result.EmailsAccepted} of {result.EmailsAttempted} contacts. Delivery is not confirmed." : $"SOS recorded, but no email alert was accepted ({result.NotificationStatus ?? "unknown"}). Contact your trusted people directly.";
+                    if (result.Recorded)
+                        SetSessionState("ATTENTION NEEDED", "SOS recorded", "An SOS event is active. Contact email acceptance does not confirm delivery. Call 112 if you need emergency help.", "End safety session");
                 }
                 catch (Exception ex) { status = $"The SOS event could not be recorded: {ex.Message}"; }
             }
