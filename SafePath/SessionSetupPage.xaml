@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" x:Class="SafePath.SessionSetupPage" Title="Session setup" BackgroundColor="#F4F7F7">
+  <ScrollView><VerticalStackLayout Padding="22,20,22,30" Spacing="18">
+    <Label Text="Plan your session" FontSize="25" FontAttributes="Bold" TextColor="#172B36" />
+    <Label Text="Choose how long you expect to be out. You can end the session any time." FontSize="14" TextColor="#647780" />
+    <Label Text="SESSION DURATION" FontSize="12" FontAttributes="Bold" TextColor="#647780" />
+    <Picker x:Name="DurationPicker" Title="Choose duration" SelectedIndex="1" BackgroundColor="White"><Picker.Items><x:String>30 minutes</x:String><x:String>60 minutes</x:String><x:String>120 minutes</x:String></Picker.Items></Picker>
+    <Label Text="DESTINATION (OPTIONAL)" FontSize="12" FontAttributes="Bold" TextColor="#647780" />
+    <Entry x:Name="DestinationEntry" Placeholder="e.g. Home, Connaught Place" BackgroundColor="White" />
+    <Label Text="ACCEPTED CONTACTS WHO CAN VIEW THIS SESSION" FontSize="12" FontAttributes="Bold" TextColor="#647780" />
+    <CollectionView x:Name="ContactsList" HeightRequest="150" EmptyView="No accepted contacts yet." SelectionMode="None">
+      <CollectionView.ItemTemplate><DataTemplate><HorizontalStackLayout Padding="6" Spacing="10"><CheckBox IsChecked="{Binding IsSelected}" Color="#147D68" /><VerticalStackLayout VerticalOptions="Center"><Label Text="{Binding DisplayName}" FontAttributes="Bold" TextColor="#172B36" /><Label Text="{Binding InvitedEmail}" FontSize="11" TextColor="#647780" /></VerticalStackLayout></HorizontalStackLayout></DataTemplate></CollectionView.ItemTemplate>
+    </CollectionView>
+    <Border Padding="15" BackgroundColor="White" Stroke="#E2EAE8" StrokeShape="RoundRectangle 16"><VerticalStackLayout Spacing="10">
+      <Label Text="Before you start" FontSize="16" FontAttributes="Bold" TextColor="#172B36" />
+      <Label Text="Your location is sent to your private account. Selected accepted contacts can view it while the session is active. Starting a session does not send contact alerts. Manual SOS email requires provider setup and cannot confirm delivery. This app does not dispatch emergency services." FontSize="13" TextColor="#647780" />
+      <HorizontalStackLayout Spacing="10"><CheckBox x:Name="ConsentCheckBox" Color="#147D68" /><Label Text="I agree to share my location for this session and understand contact alerts are not guaranteed." FontSize="13" TextColor="#263B44" VerticalOptions="Center" /></HorizontalStackLayout>
+    </VerticalStackLayout></Border>
+    <Button Text="Start safety session" Clicked="OnStartClicked" BackgroundColor="#147D68" TextColor="White" FontAttributes="Bold" CornerRadius="14" HeightRequest="54" />
+  </VerticalStackLayout></ScrollView>
+</ContentPage>
+

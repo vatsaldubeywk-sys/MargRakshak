@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" x:Class="SafePath.AuthPage" Title="Account" BackgroundColor="#F4F7F7">
+  <VerticalStackLayout Padding="24,30" Spacing="16">
+    <Label Text="Your Marg Rakshak account" FontSize="24" FontAttributes="Bold" TextColor="#172B36" />
+    <Label Text="Sign in to create a private cloud session. Location sharing only becomes available after sign-in and permission." FontSize="14" TextColor="#647780" />
+    <Entry x:Name="EmailEntry" Placeholder="Email" Keyboard="Email" TextColor="#172B36" BackgroundColor="White" />
+    <Entry x:Name="PasswordEntry" Placeholder="Password" IsPassword="True" TextColor="#172B36" BackgroundColor="White" />
+    <Button x:Name="SignInButton" Text="Sign in" Clicked="OnSignInClicked" BackgroundColor="#147D68" TextColor="White" FontAttributes="Bold" CornerRadius="14" HeightRequest="52" />
+    <Button x:Name="SignUpButton" Text="Create account" Clicked="OnSignUpClicked" BackgroundColor="White" TextColor="#147D68" FontAttributes="Bold" CornerRadius="14" HeightRequest="52" />
+    <Button x:Name="SignOutButton" Text="Sign out" Clicked="OnSignOutClicked" IsVisible="False" BackgroundColor="#FBECEC" TextColor="#A83232" CornerRadius="14" HeightRequest="48" />
+    <Label x:Name="MessageLabel" Text="Email confirmation may be required before first sign-in." FontSize="12" TextColor="#75858A" />
+  </VerticalStackLayout>
+</ContentPage>
+

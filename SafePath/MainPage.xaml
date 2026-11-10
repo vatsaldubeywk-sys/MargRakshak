@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SafePath.MainPage"
+             BackgroundColor="#F4F7F7"
+             Title="Home">
+    <ScrollView>
+        <VerticalStackLayout Padding="22,20,22,32" Spacing="22">
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="MARG RAKSHAK" FontSize="12" FontAttributes="Bold" TextColor="#16836D" CharacterSpacing="1.6" />
+                    <Label Text="Your safety, in reach." FontSize="24" FontAttributes="Bold" TextColor="#172B36" />
+                </VerticalStackLayout>
+                <Border Grid.Column="1" WidthRequest="46" HeightRequest="46" StrokeThickness="0" BackgroundColor="#E2F1EC" StrokeShape="RoundRectangle 23" VerticalOptions="Center">
+                    <Label Text="MR" TextColor="#126B5A" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+            </Grid>
+            <Button x:Name="AccountButton" Text="Sign in" Clicked="OnAccountClicked" BackgroundColor="Transparent" TextColor="#147D68" HorizontalOptions="End" Padding="8,2" />
+
+            <Border Padding="18" BackgroundColor="#FFFFFF" Stroke="#E2EAE8" StrokeShape="RoundRectangle 20">
+                <VerticalStackLayout Spacing="14">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="SAFETY SESSION" FontSize="12" FontAttributes="Bold" TextColor="#647780" CharacterSpacing="1" VerticalOptions="Center" />
+                        <Border x:Name="StatusPill" Grid.Column="1" Padding="10,5" BackgroundColor="#EEF2F2" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                            <Label x:Name="StatusLabel" Text="NOT SHARING" FontSize="10" FontAttributes="Bold" TextColor="#647780" />
+                        </Border>
+                    </Grid>
+                    <Label x:Name="SessionHeadline" Text="No active session" FontSize="21" FontAttributes="Bold" TextColor="#172B36" />
+                    <Label x:Name="SessionDescription" Text="Start a session before you head out. Your chosen contacts can follow along." FontSize="14" TextColor="#647780" LineHeight="1.3" />
+                    <Button x:Name="SessionButton" Text="Start safety session" Clicked="OnSessionClicked" BackgroundColor="#147D68" TextColor="White" FontAttributes="Bold" CornerRadius="14" HeightRequest="54" />
+                    <Label x:Name="SharingFootnoteLabel" Text="Location is not being shared." FontSize="11" TextColor="#8A989C" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Border Padding="15" BackgroundColor="#FFFFFF" Stroke="#E2EAE8" StrokeShape="RoundRectangle 18">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="⌖" FontSize="22" TextColor="#147D68" />
+                        <Label Text="Location" FontSize="14" FontAttributes="Bold" TextColor="#172B36" />
+                        <Label x:Name="LocationStatusLabel" Text="Not checked" FontSize="12" TextColor="#75858A" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Column="1" Padding="15" BackgroundColor="#FFFFFF" Stroke="#E2EAE8" StrokeShape="RoundRectangle 18">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="◷" FontSize="22" TextColor="#147D68" />
+                        <Label Text="Session timer" FontSize="14" FontAttributes="Bold" TextColor="#172B36" />
+                        <Label x:Name="CheckInStatusLabel" Text="No active session" FontSize="12" TextColor="#75858A" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Trusted contacts" FontSize="18" FontAttributes="Bold" TextColor="#172B36" VerticalOptions="Center" />
+                <Button Grid.Column="1" Text="Manage" Clicked="OnContactsClicked" BackgroundColor="Transparent" TextColor="#147D68" FontAttributes="Bold" Padding="8,4" />
+            </Grid>
+            <Border Padding="14" BackgroundColor="#FFFFFF" Stroke="#E2EAE8" StrokeShape="RoundRectangle 16">
+                <Grid ColumnDefinitions="42,*,Auto" ColumnSpacing="12">
+                    <Border WidthRequest="42" HeightRequest="42" BackgroundColor="#EAF2F4" StrokeThickness="0" StrokeShape="RoundRectangle 21">
+                        <Label Text="+" FontSize="24" TextColor="#567078" HorizontalOptions="Center" VerticalOptions="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                        <Label Text="Add someone you trust" FontSize="14" FontAttributes="Bold" TextColor="#263B44" />
+                        <Label Text="Contacts are invited with your consent" FontSize="11" TextColor="#75858A" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="›" FontSize="25" TextColor="#90A0A3" VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <Button x:Name="CheckInButton" Text="I am okay · local only" Clicked="OnCheckInClicked" IsEnabled="False" BackgroundColor="#E2F1EC" TextColor="#126B5A" FontAttributes="Bold" CornerRadius="14" HeightRequest="50" />
+            <Button x:Name="SosButton" Text="SOS  ·  I need help" Clicked="OnSosClicked" BackgroundColor="#B83D3D" TextColor="White" FontSize="17" FontAttributes="Bold" CornerRadius="16" HeightRequest="58" />
+            <Label Text="SOS is recorded and may trigger email alerts if the provider is configured. Email acceptance does not confirm delivery. Call 112 for emergency help." FontSize="11" TextColor="#7D898D" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,4 @@
+
+[functions.revoke-contact]
+verify_jwt = true
+

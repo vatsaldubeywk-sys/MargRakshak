@@ -1,0 +1,8 @@
+﻿rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All app reads and writes go through authenticated callable functions.
+    // Admin SDK bypasses these rules; every function must enforce ownership itself.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

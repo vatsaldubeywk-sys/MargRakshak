@@ -1,0 +1,26 @@
+# Local Supabase credentials and generated state
+backend/supabase/.env
+backend/supabase/.env.*
+!backend/supabase/.env.example
+backend/supabase/functions/.env
+backend/supabase/.temp/
+backend/supabase/.supabase/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Generated build and package output
+**/bin/
+**/obj/
+**/node_modules/
+.vs/
+*.user
+*.suo
+*.apk
+*.aab
+*.pfx
+*.keystore
+*.jks

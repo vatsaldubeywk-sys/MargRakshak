@@ -1,0 +1,22 @@
+project_id = "mhdnpgzfpnthrrzuooek"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[functions.start-session]
+verify_jwt = true
+[functions.update-location]
+verify_jwt = true
+[functions.create-sos]
+verify_jwt = true
+[functions.end-session]
+verify_jwt = true
+[functions.accept-contact]
+verify_jwt = true
+[functions.create-contact]
+verify_jwt = true
+[functions.revoke-contact]
+verify_jwt = true

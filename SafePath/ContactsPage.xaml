@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml" x:Class="SafePath.ContactsPage" Title="Trusted contacts" BackgroundColor="#F4F7F7">
+  <VerticalStackLayout Padding="22,20,22,24" Spacing="16">
+    <Label Text="People you trust" FontSize="25" FontAttributes="Bold" TextColor="#172B36" />
+    <Label Text="Pending invitations are emailed only when the provider is configured; otherwise, share the invitation ID privately. The invited person must accept while signed in." FontSize="14" TextColor="#647780" />
+    <Button Text="Accept invitation ID" Clicked="OnAcceptClicked" BackgroundColor="White" TextColor="#147D68" CornerRadius="12" HeightRequest="46" />
+    <Button Text="＋  Add contact" Clicked="OnAddClicked" BackgroundColor="#147D68" TextColor="White" FontAttributes="Bold" CornerRadius="14" HeightRequest="50" />
+    <CollectionView x:Name="ContactsList" EmptyView="No contacts added yet." SelectionMode="None">
+      <CollectionView.ItemTemplate><DataTemplate>
+        <Border Margin="0,4" Padding="14" BackgroundColor="White" Stroke="#E2EAE8" StrokeShape="RoundRectangle 14">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <VerticalStackLayout Spacing="3"><Label Text="{Binding DisplayName}" FontAttributes="Bold" TextColor="#172B36" /><Label Text="{Binding InvitedEmail}" FontSize="12" TextColor="#647780" /><Label Text="{Binding Id}" FontSize="10" TextColor="#75858A" /><Label Text="{Binding Status}" FontSize="11" TextColor="#A06A28" /></VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center"><Button Text="Copy ID" CommandParameter="{Binding .}" Clicked="OnCopyIdClicked" BackgroundColor="#EAF2F4" TextColor="#32515B" CornerRadius="9" Padding="10,5" /><Button Text="Revoke" CommandParameter="{Binding .}" Clicked="OnRemoveClicked" BackgroundColor="#FBECEC" TextColor="#A83232" CornerRadius="9" Padding="10,5" /></VerticalStackLayout>
+          </Grid>
+        </Border>
+      </DataTemplate></CollectionView.ItemTemplate>
+    </CollectionView>
+  </VerticalStackLayout>
+</ContentPage>
+
+
+
+
