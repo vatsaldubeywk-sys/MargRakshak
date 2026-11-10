@@ -5,10 +5,13 @@ The Android-first application is a .NET MAUI app written in C#. Supabase Auth an
 ## Current deployment status
 
 - Project: `mhdnpgzfpnthrrzuooek` (Mumbai / South Asia, Free plan).
-- Migration `20261110000000_initial_schema.sql` is applied remotely and recorded in migration history.
-- The seven existing Edge Functions are ACTIVE. Local email and check-in changes, a new database migration, and two new Edge Functions are not deployed yet.
-- Local session code requires the user to check in every 15 minutes; after a five-minute grace period, the scheduled processor attempts email to session contacts. This behavior is not live in Supabase until the migration, functions, email secrets, and Cron job are configured.
-- The Android app builds; a debug APK is produced under `SafePath/bin/Debug/net10.0-android/publish/`.
+- Migrations `20261110000000_initial_schema.sql` and `20261110010000_server_checkins.sql` are applied and recorded remotely.
+- All nine Edge Functions are ACTIVE. The updated email/check-in functions are deployed.
+- Cron job `marg-rakshak-missed-checkins` is active every minute; its latest observed runs succeeded. The 15-minute check-in and five-minute grace logic is live.
+- `CHECKIN_CRON_SECRET` is stored in Edge Function Secrets, and its matching token plus the project URL are stored in Vault.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are not configured yet. Until they are added, no contact email can be sent.
+- Android local reminder notifications are implemented. The user must grant notification permission for the phone reminder to appear.
+- Android build succeeds. A publishable APK can be generated under `SafePath/bin/Debug/net10.0-android/publish/`.
 - `viewer/index.html` exists locally but is not hosted yet.
 
 ## Implemented endpoints
@@ -20,7 +23,7 @@ The Android-first application is a .NET MAUI app written in C#. Supabase Auth an
 - `update-location`: validates and stores idempotent location samples for an active session.
 - `create-sos`: records an idempotent SOS event and attempts email alerts to the accepted responders for the session when the mail provider is configured.
 - `check-in`: records a check-in transactionally and resets the next due time.
-- `process-missed-checkins`: a secret-key-protected scheduled function that claims overdue sessions and sends idempotent email alerts.
+- `process-missed-checkins`: a Cron-token-protected scheduled function that claims overdue sessions and sends idempotent email alerts.
 - `end-session`: ends sharing; RLS stops responders from reading the session.
 
 RLS permits authenticated owners and currently authorized responders to read session data. Client writes are revoked; mutations go through authenticated functions. The Firebase scaffold under `backend/functions` is legacy and is not the active backend design.
@@ -34,17 +37,17 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 - `RESEND_API_KEY`: the Resend sending API key.
 - `RESEND_FROM_EMAIL`: a sender on the verified domain, for example `Marg Rakshak <alerts@your-verified-domain>`.
 
-Never put either value in the mobile app, source files, or chat. Apply the new migration first with `.\deploy.ps1`, then add both secrets in **Supabase Dashboard → Edge Functions → Secrets** and run `.\deploy-email.ps1`. Confirm with `DEPLOY-EMAIL`. It deploys the email-enabled contact/SOS functions plus session/check-in processing using Supabase API bundling (Docker is not required).
+Never put either value in the mobile app, source files, or chat. Add both secrets in **Supabase Dashboard → Edge Functions → Secrets**. The functions are already deployed and read secrets at runtime, so adding them does not require another deployment. Run `.\deploy-email.ps1` only after future local function changes, then confirm with `DEPLOY-EMAIL`.
 
-The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. The Android phone reminder appears at the scheduled check-in time when notification permission is allowed. The server-side missed-check-in timer becomes active only after applying the migration, deploying the functions, configuring email secrets, and scheduling the Cron job below. No email delivery receipt, responder acknowledgement, remote push notification, or emergency dispatch is configured. For emergencies in India, call 112.
+The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. The Android phone reminder appears at the scheduled check-in time when notification permission is allowed. The backend timer is active, but contact email alerts remain unavailable until the Resend secrets are configured. No email delivery receipt, responder acknowledgement, remote push notification, or emergency dispatch is configured. For emergencies in India, call 112.
 
 ## Schedule missed-check-in processing
 
-The server processor must run every minute. Enable `pg_cron`, `pg_net`, and `supabase_vault` in **Database → Extensions**. In the SQL Editor, store the project URL and a server-only Supabase Secret API key (or legacy service-role key) in Vault, then schedule the request below. Do not use the mobile publishable key. The key is placed in the `apikey` request header and is never embedded in the app or migration.
+The production job is already active every minute. The block below is for a fresh project or a deliberate job recreation; do not rerun its `vault.create_secret` statements on this project. Enable `pg_cron`, `pg_net`, and `supabase_vault` in **Database → Extensions**. Add a random `CHECKIN_CRON_SECRET` in **Edge Functions → Secrets**, then store that token and the project URL in Vault before scheduling. This dedicated token does not grant database access; the function checks it before using its server-side Supabase client. Never put it in the mobile app or migration.
 
 ```sql
 select vault.create_secret('https://mhdnpgzfpnthrrzuooek.supabase.co', 'marg_rakshak_project_url');
-select vault.create_secret('PASTE_SERVER_SECRET_KEY_HERE', 'marg_rakshak_cron_api_key');
+select vault.create_secret('PASTE_THE_SAME_CHECKIN_CRON_SECRET_HERE', 'marg_rakshak_cron_token');
 
 select cron.schedule(
   'marg-rakshak-missed-checkins',
@@ -54,7 +57,7 @@ select cron.schedule(
       url := (select decrypted_secret from vault.decrypted_secrets where name = 'marg_rakshak_project_url') || '/functions/v1/process-missed-checkins',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'marg_rakshak_cron_api_key')
+        'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'marg_rakshak_cron_token')
       ),
       body := '{}'::jsonb,
       timeout_milliseconds := 10000

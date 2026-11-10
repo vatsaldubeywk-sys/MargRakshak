@@ -3,7 +3,7 @@ import { isEmailConfigured, sendTransactionalEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "apikey, content-type",
+  "Access-Control-Allow-Headers": "content-type, x-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -11,23 +11,16 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
 
-function hasSecretApiKey(req: Request): boolean {
-  const provided = req.headers.get("apikey");
-  if (!provided) return false;
-  try {
-    const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
-    const allowed = [...Object.values(keys), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")]
-      .filter((value): value is string => typeof value === "string" && value.length > 0);
-    return allowed.some((key) => key === provided);
-  } catch {
-    return false;
-  }
+function hasCronSecret(req: Request): boolean {
+  const expected = Deno.env.get("CHECKIN_CRON_SECRET");
+  const provided = req.headers.get("x-cron-secret");
+  return Boolean(expected && provided && expected === provided);
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "POST required." }, 405);
-  if (!hasSecretApiKey(req)) return json({ error: "Service authentication required." }, 401);
+  if (!hasCronSecret(req)) return json({ error: "Cron authentication required." }, 401);
 
   const url = Deno.env.get("SUPABASE_URL");
   const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
