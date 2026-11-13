@@ -5,13 +5,15 @@ The Android-first application is a .NET MAUI app written in C#. Supabase Auth an
 ## Current deployment status
 
 - Project: `mhdnpgzfpnthrrzuooek` (Mumbai / South Asia, Free plan).
-- Migrations `20261110000000_initial_schema.sql` and `20261110010000_server_checkins.sql` are applied and recorded remotely.
-- All nine Edge Functions are ACTIVE. The updated email/check-in functions are deployed.
-- Cron job `marg-rakshak-missed-checkins` is active every minute; its latest observed runs succeeded. The 15-minute check-in and five-minute grace logic is live.
+- Migrations `20261110000000_initial_schema.sql`, `20261110010000_server_checkins.sql`, and `20261113000000_safety_hardening.sql` are applied and recorded remotely.
+- All nine Edge Functions are deployed. They enforce one live session per owner, require an accepted responder for a new session, and track missed-check-in delivery per contact.
+- Cron job `marg-rakshak-missed-checkins` is active every minute. It processes missed check-ins, closes expired sessions, and purges location samples after 24 hours and ended-session records after 90 days.
 - `CHECKIN_CRON_SECRET` is stored in Edge Function Secrets, and its matching token plus the project URL are stored in Vault.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are not configured yet. Until they are added, no contact email can be sent.
 - Android local reminder notifications are implemented. The user must grant notification permission for the phone reminder to appear.
-- Android build succeeds. A publishable APK can be generated under `SafePath/bin/Debug/net10.0-android/publish/`.
+- Android location sampling uses available GPS and network providers. SOS requires a 2.5-second hold.
+- Continuous background safety sessions are Android-only. The iOS target does not implement background location and must not be used to start a safety session.
+- Android build succeeds. Distribute a standalone Release APK; Debug Fast Deployment APKs are for development and will not run by themselves.
 - `viewer/index.html` exists locally but is not hosted yet.
 
 ## Implemented endpoints
@@ -39,7 +41,7 @@ In **Supabase Dashboard → Edge Functions → Secrets**, add:
 
 Never put either value in the mobile app, source files, or chat. Add both secrets in **Supabase Dashboard → Edge Functions → Secrets**. The functions are already deployed and read secrets at runtime, so adding them does not require another deployment. Run `.\deploy-email.ps1` only after future local function changes, then confirm with `DEPLOY-EMAIL`.
 
-The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. The Android phone reminder appears at the scheduled check-in time when notification permission is allowed. The backend timer is active, but contact email alerts remain unavailable until the Resend secrets are configured. No email delivery receipt, responder acknowledgement, remote push notification, or emergency dispatch is configured. For emergencies in India, call 112.
+The app reports when the email API accepts a request; that is not proof the email reached the inbox or that a responder saw it. The Android phone reminder appears at the scheduled check-in time when notification permission is allowed. Contact email alerts remain unavailable until the Resend secrets are configured. No email delivery receipt, responder acknowledgement, remote push notification, or emergency dispatch is configured. For emergencies in India, call 112.
 
 ## Schedule missed-check-in processing
 
@@ -87,7 +89,7 @@ Function deployment is skipped by default in `deploy.ps1`. Use `-DeployFunctions
 
 ## Responder viewer
 
-`viewer/index.html` is a static, read-only viewer. It must be hosted on a static HTTPS host before responders can use it. A responder signs in with the same confirmed email used to accept the invitation. The viewer polls RLS-protected session data every 15 seconds and labels locations older than 60 seconds as stale. It does not dispatch responders or confirm that help is coming.
+`viewer/index.html` is a static, read-only viewer. It must be hosted on a static HTTPS host before responders can use it. A responder signs in with the same confirmed email used to accept the invitation. The viewer polls RLS-protected session data every 15 seconds and warns when the last location is older than 90 seconds. It does not dispatch responders or confirm that help is coming.
 
 ## Local development
 

@@ -50,6 +50,11 @@ public partial class SessionSetupPage : ContentPage
         var minutes = durations[Math.Clamp(DurationPicker.SelectedIndex, 0, durations.Length - 1)];
         var destination = string.IsNullOrWhiteSpace(DestinationEntry.Text) ? null : DestinationEntry.Text.Trim();
         var contactIds = _contacts.Where(c => c.IsSelected).Select(c => c.Id).ToArray();
+        if (contactIds.Length == 0)
+        {
+            await DisplayAlertAsync("Select a trusted contact", "Choose at least one accepted contact so someone can receive a missed-check-in or SOS email when email alerts are configured.", "OK");
+            return;
+        }
         await Shell.Current.GoToAsync("..");
         if (Shell.Current.CurrentPage is MainPage home)
             await home.StartLocalSessionAsync(minutes, destination, contactIds);

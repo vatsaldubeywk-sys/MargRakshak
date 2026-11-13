@@ -1,24 +1,25 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isEmailConfigured, sendTransactionalEmail } from "../_shared/email.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, x-cron-secret",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { ...corsHeaders, "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json" },
 });
 
 function hasCronSecret(req: Request): boolean {
   const expected = Deno.env.get("CHECKIN_CRON_SECRET");
   const provided = req.headers.get("x-cron-secret");
-  return Boolean(expected && provided && expected === provided);
+  if (!expected || !provided) return false;
+  const encoder = new TextEncoder();
+  const a = encoder.encode(expected);
+  const b = encoder.encode(provided);
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+  return difference === 0;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "POST required." }, 405);
   if (!hasCronSecret(req)) return json({ error: "Cron authentication required." }, 401);
 
@@ -28,6 +29,12 @@ Deno.serve(async (req) => {
   if (!url || !adminKey) return json({ error: "Server configuration is incomplete." }, 500);
 
   const admin = createClient(url, adminKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const expired = await admin.rpc("expire_safety_sessions");
+  const purged = await admin.rpc("purge_expired_location_samples");
+  if (expired.error || purged.error) {
+    console.error("Could not perform session cleanup.");
+    return json({ error: "Could not perform session cleanup." }, 500);
+  }
   const claimed = await admin.rpc("claim_overdue_checkins", { p_now: new Date().toISOString() });
   if (claimed.error) {
     console.error("Could not claim overdue sessions.");
@@ -56,6 +63,22 @@ Deno.serve(async (req) => {
     }
     if (!isEmailConfigured()) continue;
 
+    const deliveryRows = await admin.from("alert_deliveries")
+      .select("contact_id,status")
+      .eq("session_id", session.session_id)
+      .eq("due_at", session.due_at)
+      .in("contact_id", contacts.data.map((contact) => contact.id));
+    if (deliveryRows.error) continue;
+    const acceptedContactIds = new Set((deliveryRows.data ?? [])
+      .filter((delivery) => delivery.status === "accepted")
+      .map((delivery) => delivery.contact_id));
+    const pendingContacts = contacts.data.filter((contact) => !acceptedContactIds.has(contact.id));
+    if (pendingContacts.length === 0) {
+      await admin.from("safety_sessions").update({ missed_check_in_notified_at: new Date().toISOString() })
+        .eq("id", session.session_id).eq("next_check_in_at", session.due_at);
+      continue;
+    }
+
     const hasLocation = Number.isFinite(session.latitude) && Number.isFinite(session.longitude);
     const mapUrl = hasLocation
       ? `https://www.openstreetmap.org/?mlat=${session.latitude}&mlon=${session.longitude}#map=16/${session.latitude}/${session.longitude}`
@@ -75,17 +98,31 @@ Deno.serve(async (req) => {
     ].join("\n");
 
     const dueKey = String(session.due_at).replace(/[^0-9A-Za-z]/g, "-");
-    const attempts = await Promise.all(contacts.data.map((contact) =>
-      sendTransactionalEmail(
-        contact.invited_email,
-        "Marg Rakshak: missed check-in",
-        text,
-        `mr-missed-${session.session_id}-${dueKey}-${contact.id}`,
-      )
-    ));
-    const accepted = attempts.filter((attempt) => attempt.accepted).length;
+    const attempts = await Promise.all(pendingContacts.map(async (contact) => {
+      const key = `mr-missed-${session.session_id}-${dueKey}-${contact.id}`;
+      const started = await admin.from("alert_deliveries").upsert({
+        session_id: session.session_id,
+        contact_id: contact.id,
+        due_at: session.due_at,
+        status: "pending",
+        attempted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "session_id,contact_id,due_at" });
+      if (started.error) return false;
+      const attempt = await sendTransactionalEmail(contact.invited_email, "Marg Rakshak: missed check-in", text, key);
+      const finished = await admin.from("alert_deliveries").upsert({
+        session_id: session.session_id,
+        contact_id: contact.id,
+        due_at: session.due_at,
+        status: attempt.accepted ? "accepted" : "failed",
+        attempted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "session_id,contact_id,due_at" });
+      return attempt.accepted && !finished.error;
+    }));
+    const accepted = attempts.filter(Boolean).length;
     emailsAccepted += accepted;
-    if (accepted === contacts.data.length) {
+    if (acceptedContactIds.size + accepted === contacts.data.length) {
       await admin.from("safety_sessions").update({ missed_check_in_notified_at: new Date().toISOString() })
         .eq("id", session.session_id).eq("next_check_in_at", session.due_at);
     }

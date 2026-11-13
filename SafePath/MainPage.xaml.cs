@@ -14,6 +14,8 @@ public partial class MainPage : ContentPage
     private DateTimeOffset? _nextCheckInAt;
     private DateTimeOffset? _sessionExpiresAt;
     private bool _sosBusy;
+    private CancellationTokenSource? _sosHold;
+    private bool _sosHoldCompleted;
     private bool _restoringSession;
     private bool _localReminderEnabled;
     private CancellationTokenSource? _sessionExpiry;
@@ -22,18 +24,39 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
-#if ANDROID
-        LocationSampleStore.Updated += OnBackgroundLocationChanged;
-#endif
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+#if ANDROID
+        SetLocationListener(true);
+#endif
         try { await _auth.GetAccessTokenAsync(); AccountButton.Text = "Account"; }
         catch { AccountButton.Text = "Sign in"; }
         await RestoreSessionAsync();
     }
+
+    protected override void OnDisappearing()
+    {
+#if IOS || ANDROID
+        _sosHold?.Cancel();
+        _sosHoldCompleted = false;
+        SosButton.Text = "Hold SOS for 2.5 seconds";
+#endif
+#if ANDROID
+        if (!_sessionActive) SetLocationListener(false);
+#endif
+        base.OnDisappearing();
+    }
+
+#if ANDROID
+    private void SetLocationListener(bool enabled)
+    {
+        LocationSampleStore.Updated -= OnBackgroundLocationChanged;
+        if (enabled) LocationSampleStore.Updated += OnBackgroundLocationChanged;
+    }
+#endif
 
     public void SetAccountStatus(string? email) => AccountButton.Text = string.IsNullOrWhiteSpace(email) ? "Sign in" : $"Signed in · {email}";
 
@@ -45,6 +68,9 @@ public partial class MainPage : ContentPage
         {
             _sessionExpiry?.Cancel();
             _sessionActive = false;
+#if ANDROID
+            SetLocationListener(false);
+#endif
             StopBackgroundLocation();
             try { if (_sessionId is not null) await _api.EndSessionAsync(_sessionId); }
             catch (Exception ex) { await DisplayAlertAsync("Session ended locally", $"The phone stopped tracking, but server closure could not be confirmed: {ex.Message}", "OK"); }
@@ -63,6 +89,10 @@ public partial class MainPage : ContentPage
 
     public async Task StartLocalSessionAsync(int minutes, string? destination, IReadOnlyList<string> contactIds)
     {
+#if IOS
+        await DisplayAlertAsync("Android required", "Continuous background location sharing is currently supported on Android only. Account and contact features may be used here, but do not start a safety session on this device.", "OK");
+        return;
+#endif
         if (_locationBusy) return;
         try { await _auth.GetAccessTokenAsync(); }
         catch
@@ -241,6 +271,9 @@ public partial class MainPage : ContentPage
                 if (!_sessionActive) return;
                 _sessionExpiry?.Cancel();
                 _sessionActive = false;
+#if ANDROID
+                SetLocationListener(false);
+#endif
                 StopBackgroundLocation();
                 try { if (_sessionId is not null) await _api.EndSessionAsync(_sessionId); } catch { }
                 _sessionId = null;
@@ -287,6 +320,18 @@ public partial class MainPage : ContentPage
 #endif
     }
 
+    private static void UpdateCheckInReminder(DateTimeOffset? nextCheckInAt)
+    {
+#if ANDROID
+        if (nextCheckInAt is not { } next) return;
+        var context = Android.App.Application.Context;
+        var intent = new Android.Content.Intent(context, typeof(SafetyLocationService));
+        intent.SetAction(SafetyLocationService.ActionScheduleCheckIn);
+        intent.PutExtra("nextCheckInAtUtcTicks", next.UtcDateTime.Ticks);
+        context.StartService(intent);
+#endif
+    }
+
     private async void OnCheckInClicked(object? sender, EventArgs e)
     {
         if (!_sessionActive || _sessionId is null) return;
@@ -296,8 +341,7 @@ public partial class MainPage : ContentPage
             var result = await _api.CheckInAsync(_sessionId, Guid.NewGuid().ToString());
             if (!result.Success) throw new InvalidOperationException("The server did not accept this check-in.");
             _nextCheckInAt = result.NextCheckInAt;
-            if (_sessionExpiresAt is { } expiry)
-                StartBackgroundLocation(Math.Max(1, (int)Math.Ceiling((expiry - DateTimeOffset.UtcNow).TotalMinutes)), _nextCheckInAt, expiry);
+            UpdateCheckInReminder(_nextCheckInAt);
             CheckInStatusLabel.Text = _nextCheckInAt is { } due
                 ? $"Checked in · next by {due.ToLocalTime():t}" + (_localReminderEnabled ? " · reminder on" : " · reminder off")
                 : "Check-in recorded";
@@ -318,8 +362,37 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async void OnSosPressed(object? sender, EventArgs e)
+    {
+        _sosHold?.Cancel();
+        _sosHold?.Dispose();
+        _sosHold = new CancellationTokenSource();
+        _sosHoldCompleted = false;
+        SosButton.Text = "Keep holding…";
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2.5), _sosHold.Token);
+            _sosHoldCompleted = true;
+            SosButton.Text = "Release to send SOS";
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void OnSosReleased(object? sender, EventArgs e)
+    {
+        _sosHold?.Cancel();
+        if (!_sosHoldCompleted) SosButton.Text = "Hold SOS for 2.5 seconds";
+    }
+
     private async void OnSosClicked(object? sender, EventArgs e)
     {
+        if (!_sosHoldCompleted)
+        {
+            SosButton.Text = "Hold SOS for 2.5 seconds";
+            return;
+        }
+        _sosHoldCompleted = false;
+        SosButton.Text = "Hold SOS for 2.5 seconds";
         if (_sosBusy) return;
         _sosBusy = true;
         SosButton.IsEnabled = false;

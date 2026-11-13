@@ -4,16 +4,17 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST required." }, 405);
   const auth = await authorize(req); if (isResponse(auth)) return auth;
   try {
+    const expired = await auth.admin.rpc("expire_safety_sessions");
+    if (expired.error) return json({ error: "Could not verify existing sessions." }, 503);
     const body = await req.json();
     const duration = Number(body.durationMinutes);
     if (![30, 60, 120].includes(duration)) return json({ error: "Choose 30, 60, or 120 minutes." }, 400);
     const ids: string[] = Array.isArray(body.contactIds) ? [...new Set(body.contactIds)].slice(0, 10) : [];
+    if (ids.length === 0) return json({ error: "Select at least one accepted trusted contact." }, 400);
     let contacts: any[] = [];
-    if (ids.length) {
-      const result = await auth.admin.from("trusted_contacts").select("id,responder_id,status").eq("owner_id", auth.userId).in("id", ids).eq("status", "accepted");
-      if (result.error || result.data.length !== ids.length || result.data.some((c) => !c.responder_id)) return json({ error: "All selected contacts must accept first." }, 409);
-      contacts = result.data;
-    }
+    const result = await auth.admin.from("trusted_contacts").select("id,responder_id,status").eq("owner_id", auth.userId).in("id", ids).eq("status", "accepted");
+    if (result.error || result.data.length !== ids.length || result.data.some((c) => !c.responder_id)) return json({ error: "All selected contacts must accept first." }, 409);
+    contacts = result.data;
     const startedAt = Date.now();
     const expiresAt = new Date(startedAt + duration * 60000).toISOString();
     const nextCheckInAt = new Date(startedAt + Math.min(15, duration) * 60000).toISOString();
@@ -25,6 +26,7 @@ Deno.serve(async (req) => {
       check_in_grace_minutes: 5,
       next_check_in_at: nextCheckInAt,
     }).select("id").single();
+    if (created.error?.code === "23505") return json({ error: "End your current safety session before starting another." }, 409);
     if (created.error) return json({ error: "Could not start session." }, 500);
     if (contacts.length) {
       const link = await auth.admin.from("session_responders").insert(contacts.map((c) => ({ session_id: created.data.id, owner_id: auth.userId, responder_id: c.responder_id, contact_id: c.id })));

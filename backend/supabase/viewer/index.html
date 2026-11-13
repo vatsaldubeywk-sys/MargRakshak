@@ -54,12 +54,13 @@
     for (const session of rows ?? []) {
       const last = session.last_location_at ? new Date(session.last_location_at) : null;
       const age = last ? Math.max(0, Math.floor((Date.now() - last.getTime()) / 1000)) : null;
-      const isStale = age === null || age > 60;
+      const isStale = age === null || age > 90;
       const status = session.status === 'alert' ? 'ATTENTION NEEDED' : (isStale ? 'STALE LOCATION' : 'SESSION ACTIVE');
       const point = Number.isFinite(session.last_latitude) && Number.isFinite(session.last_longitude);
       const map = point ? `<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${session.last_latitude}&mlon=${session.last_longitude}#map=16/${session.last_latitude}/${session.last_longitude}">Open last location in map</a>` : 'No location sample received';
+      const staleNotice = isStale ? `<div class="notice"><strong>STALE / UNREACHABLE</strong><br>Last known location received ${age === null ? 'never' : `${age}s ago`}. The device may be offline or location updates may have stopped.</div>` : '';
       const card = document.createElement('article'); card.className = 'session';
-      card.innerHTML = `<h2>${escapeHtml(session.destination || 'Shared safety session')}</h2><span class="pill ${isStale ? 'stale' : ''}">${status}</span><p class="data">Last location: ${last ? `${escapeHtml(last.toLocaleString())} (${age}s ago)` : 'Never received'}<br>Accuracy: ${Number.isFinite(session.last_accuracy_m) ? `±${Math.round(session.last_accuracy_m)} m` : 'Unknown'}<br>Session expires: ${escapeHtml(new Date(session.expires_at).toLocaleString())}<br>${map}</p>`;
+      card.innerHTML = `<h2>${escapeHtml(session.destination || 'Shared safety session')}</h2><span class="pill ${isStale ? 'stale' : ''}">${status}</span>${staleNotice}<p class="data">Last location: ${last ? `${escapeHtml(last.toLocaleString())} (${age}s ago)` : 'Never received'}<br>Accuracy: ${Number.isFinite(session.last_accuracy_m) ? `±${Math.round(session.last_accuracy_m)} m` : 'Unknown'}<br>Session expires: ${escapeHtml(new Date(session.expires_at).toLocaleString())}<br>${map}</p>`;
       $('sessions').append(card);
     }
     $('viewerMessage').textContent = `Updated ${new Date().toLocaleTimeString()}. Provider delivery is not shown here.`;

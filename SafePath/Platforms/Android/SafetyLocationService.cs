@@ -12,6 +12,7 @@ public sealed class SafetyLocationService : Service, ILocationListener
 {
     public const string ActionStart = "com.safepath.action.START_LOCATION";
     public const string ActionStop = "com.safepath.action.STOP_LOCATION";
+    public const string ActionScheduleCheckIn = "com.safepath.action.SCHEDULE_CHECK_IN";
     private const string ChannelId = "safety_session";
     private const string CheckInChannelId = "safety_checkin_reminders";
     private const int CheckInNotificationId = 42;
@@ -31,6 +32,17 @@ public sealed class SafetyLocationService : Service, ILocationListener
         {
             StopSelf();
             return StartCommandResult.NotSticky;
+        }
+
+        if (intent?.Action == ActionScheduleCheckIn)
+        {
+            var next = intent.GetLongExtra("nextCheckInAtUtcTicks", 0);
+            if (_manager is not null)
+            {
+                if (next > 0) ScheduleCheckInReminder(next);
+                return StartCommandResult.Sticky;
+            }
+            intent.SetAction(ActionStart);
         }
 
         var notification = CreateSessionNotification();
@@ -58,8 +70,15 @@ public sealed class SafetyLocationService : Service, ILocationListener
         _manager = (LocationManager?)GetSystemService(LocationService);
         try
         {
-            _manager?.RemoveUpdates(this);
-            _manager?.RequestLocationUpdates(LocationManager.GpsProvider, 15000, 10, this, Looper.MainLooper);
+            if (_manager is not null)
+            {
+                _manager.RemoveUpdates(this);
+                foreach (var provider in _manager.GetProviders(true))
+                {
+                    if (provider is LocationManager.GpsProvider or LocationManager.NetworkProvider)
+                        _manager.RequestLocationUpdates(provider, 15000, 10, this, Looper.MainLooper);
+                }
+            }
         }
         catch (Java.Lang.SecurityException)
         {
