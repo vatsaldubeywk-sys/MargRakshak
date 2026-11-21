@@ -1,3 +1,4 @@
+import {SafetyRadar} from '../components/SafetyRadar';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -15,7 +16,7 @@ import {
   Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useIsFocused, useFocusEffect } from '@react-navigation/native';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { v4 as uuidv4 } from 'uuid';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -29,7 +30,6 @@ import familyContactsService from '../services/familyContactsService';
 import smsService from '../services/smsService';
 import stationaryDetector, { StationaryEvent } from '../services/stationaryDetector';
 import { SosButton } from '../components/SosButton';
-import { SafetyRadar } from '../components/SafetyRadar';
 import { QuickToolsBar } from '../components/QuickToolsBar';
 import { JourneyPresets, PresetItem } from '../components/JourneyPresets';
 import { SirenModal } from '../components/SirenModal';
@@ -41,7 +41,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const isDark = useColorScheme() === 'dark';
-  const isFocused = useIsFocused();
+
 
   // ─── State Management ─────────────────────────────────────────────────
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
@@ -86,18 +86,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const requestLocationPermissions = async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
       try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Marg Rakshak Location Permission',
-            message:
-              'Marg Rakshak needs accurate GPS access to share your location with trusted contacts during emergencies.',
-            buttonNeutral: 'Ask Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'Grant',
-          },
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
+        const granted = await PermissionsAndroid.requestMultiple([PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION, PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION]);
+        return granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === 'granted';
+
       } catch (err) {
         console.warn('Failed to request location permission:', err);
         return false;
@@ -157,6 +148,18 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       const storedSessionId = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
       if (storedSessionId) {
+        if (storedSessionId.startsWith('{')) {
+          const saved: StartSessionResult = JSON.parse(storedSessionId);
+          const remaining = Date.parse(saved.expiresAt) - Date.now();
+          if (remaining <= 0) { await AsyncStorage.removeItem(ACTIVE_SESSION_KEY); return; }
+          setSessionId(saved.sessionId);
+          setSessionActive(true);
+          setSessionExpiresAt(saved.expiresAt);
+          setNextCheckInAt(saved.nextCheckInAt);
+          locationService.startTracking(saved.sessionId, Math.ceil(remaining / 60000), saved.nextCheckInAt, saved.expiresAt, saved.phones);
+          scheduleAutoExpiry(saved.expiresAt);
+          return;
+        }
         const active = await functionsService.getSession(storedSessionId);
         if (active && active.status === 'active') {
           const isExpired = new Date(active.expires_at).getTime() <= Date.now();
@@ -223,11 +226,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   // ─── Refresh auth & session on screen focus ───────────────────────────
-  useFocusEffect(
-    useCallback(() => {
-      checkAuth();
-    }, [checkAuth]),
-  );
+
 
   // ─── On Mount: Initial check, stationary & location subscription ────────
   useEffect(() => {
@@ -290,7 +289,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       setSessionExpiresAt(expiresAt);
       setLocationStatusText('Session started, location tracking active');
 
-      AsyncStorage.setItem(ACTIVE_SESSION_KEY, newId).catch(err =>
+      AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(sessionResult)).catch(err =>
         console.warn('Failed to save session ID:', err),
       );
 
@@ -299,8 +298,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         1,
         Math.round((new Date(expiresAt).getTime() - Date.now()) / 60000),
       );
-      locationService.startTracking(newId, durationMins, checkInTime, expiresAt);
-      stationaryDetector.start(4, 25);
+      locationService.startTracking(newId, durationMins, checkInTime, expiresAt, sessionResult.phones);
+      if (Platform.OS !== 'android') stationaryDetector.start(4, 25);
       scheduleAutoExpiry(expiresAt);
 
       // Clear params so we don't re-trigger on subsequent renders
@@ -319,6 +318,20 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
+    const chosen = (await familyContactsService.getContacts()).filter(c => c.isSelected).map(c => c.phoneNumber).sort();
+    const saved = await AsyncStorage.getItem('family.quickStart');
+    if (Platform.OS === 'android' && chosen.length && saved) {
+      const plan = JSON.parse(saved);
+      if (JSON.stringify(chosen) === JSON.stringify(plan.phones) && [30,60,120].includes(plan.minutes)
+          && await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.SEND_SMS)
+          && (Number(Platform.Version) < 33 || await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS))) {
+        const now = Date.now();
+        navigation.setParams({ sessionResult: { sessionId: uuidv4(), phones: chosen,
+          expiresAt: new Date(now + plan.minutes * 60000).toISOString(),
+          nextCheckInAt: new Date(now + 900000).toISOString() } });
+        return;
+      }
+    }
     navigation.navigate('SessionSetup');
   };
 
@@ -338,12 +351,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             try {
               setLocationBusy(true);
               stationaryDetector.stop();
-              try {
-                await functionsService.endSession(sessionId);
-              } catch {
-                // offline session
-              }
               locationService.stopTracking();
+              functionsService.endSession(sessionId).catch(() => {});
               clearExpiryTimer();
               await AsyncStorage.removeItem(ACTIVE_SESSION_KEY);
 
@@ -389,6 +398,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setLocationBusy(true);
       const eventKey = uuidv4();
+      locationService.updateSession(0, true);
       stationaryDetector.resetAnchor(lastLocation);
       try {
         const result = await functionsService.checkIn(sessionId, eventKey);
@@ -416,7 +426,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   // ─── Extend Active Session (+15 Minutes) ──────────────────────────────
-  const handleExtendSession = () => {
+  const handleExtendSession = async () => {
     if (!sessionActive || !sessionExpiresAt) {
       Alert.alert('No Active Session', 'Start a safety session to extend its duration.');
       return;
@@ -424,6 +434,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     const currentExpiry = new Date(sessionExpiresAt).getTime();
     const newExpiryDate = new Date(currentExpiry + 15 * 60 * 1000);
     const newExpiryIso = newExpiryDate.toISOString();
+    const stored = await AsyncStorage.getItem(ACTIVE_SESSION_KEY);
+    if (stored?.startsWith('{')) {
+      const saved = JSON.parse(stored);
+      await AsyncStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify({ ...saved, expiresAt: newExpiryIso }));
+    }
+    locationService.updateSession(newExpiryDate.getTime(), false);
     setSessionExpiresAt(newExpiryIso);
     scheduleAutoExpiry(newExpiryIso);
     Alert.alert(
@@ -480,7 +496,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     const accuracy = lastLocation?.accuracy ?? 15;
     const userName = userEmail ? userEmail.split('@')[0] : 'Your family member';
 
-    const smsBody = smsService.formatInactivityEmergencySms(
+    const smsBody = !lastLocation ? 'Marg Rakshak: no response to check-in. GPS unavailable. Call me now.' : smsService.formatInactivityEmergencySms(
       userName,
       lat,
       lon,
@@ -531,7 +547,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     const selectedFam = familyContacts.filter(c => c.isSelected);
     let smsSentCount = 0;
     if (selectedFam.length > 0) {
-      const sosSms = smsService.formatSosEmergencySms(userName, lat, lon, accuracy);
+      const sosSms = lastLocation
+        ? smsService.formatSosEmergencySms(userName, lat, lon, accuracy) + ' Fix time: ' + new Date(lastLocation.timestamp).toISOString()
+        : 'Marg Rakshak SOS: I need help. GPS unavailable. Please call me immediately.';
       const res = await smsService.sendEmergencySmsToFamily(selectedFam, sosSms);
       smsSentCount = res.sentCount;
     }
@@ -546,11 +564,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     // 3. Inform user and provide 1-tap ERSS 112 dialer
     const smsNotice =
       smsSentCount > 0
-        ? `Emergency SMS with your GPS pin was dispatched to ${smsSentCount} family contact(s) via SIM network.`
-        : `Emergency SOS triggered. (Configure family contacts in Contacts to enable automated SIM SMS).`;
+        ? `SOS SMS was submitted to ${smsSentCount} family contact(s) via SIM network.`
+        : `No automatic SMS submission confirmed. Check your SIM and selected contacts.`;
 
     Alert.alert(
-      '🚨 SOS Emergency Alert Dispatched!',
+      'SOS status',
       `${smsNotice}\n\nDo you want to dial Emergency Services (112) now?`,
       [
         {
@@ -596,261 +614,55 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       style={[styles.container, { backgroundColor: dynamicStyles.screenBg }]}
       contentContainerStyle={styles.scrollContent}
     >
-      {/* ─── Header ────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerBrandRow}>
-          <Image
-            source={require('../assets/logo.png')}
-            style={styles.headerLogo}
-            accessibilityLabel="Marg Rakshak App Icon"
-          />
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.brandTitle, { color: COLORS.primary }]}>
-              MARG RAKSHAK
-            </Text>
-            <Text style={[styles.brandSubtitle, { color: dynamicStyles.secondaryText }]}>
-              Your safety, in reach.
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.accountButton,
-            {
-              backgroundColor: isSignedIn ? COLORS.primaryLight : dynamicStyles.cardBg,
-              borderColor: COLORS.primary,
-            },
-          ]}
-          onPress={() => navigation.navigate('Auth')}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={isSignedIn ? 'Manage Account' : 'Sign In'}
-        >
-          <Text style={[styles.accountButtonText, { color: COLORS.primaryDark }]}>
-            {isSignedIn ? 'Account' : 'Sign In'}
-          </Text>
+        <Image source={require('../assets/logo.png')} style={styles.logo} />
+        <Text accessibilityRole="header" style={[styles.brand, {color: dynamicStyles.textColor}]}>Marg Rakshak</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Auth')} style={styles.account}>
+          <Text style={{color: isDark ? '#AFDCD2' : COLORS.primaryDark}}>{isSignedIn ? 'Account' : 'Sign in'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ─── Interactive Safety Radar Visualizer ─────────────── */}
-      <SafetyRadar
-        sessionActive={sessionActive}
-        nextCheckInAt={nextCheckInAt}
-        sessionExpiresAt={sessionExpiresAt}
-        gpsAccuracy={lastLocation ? Math.round(lastLocation.accuracy) : undefined}
-        contactCount={contactsCount}
-        onQuickCheckIn={handleCheckIn}
-        onExtendSession={handleExtendSession}
-        checkInBusy={locationBusy}
-      />
-
-      {/* ─── Emergency Quick Toolkit ────────────────────────── */}
-      <QuickToolsBar
-        onOpenSiren={() => setShowSiren(true)}
-        onOpenFakeCall={() => setShowFakeCall(true)}
-        onOpenHelpline={() => setShowHelplines(true)}
-        onShareQuickPin={handleShareQuickPin}
-      />
-
-      {/* ─── 1-Tap Journey Presets (Visible when idle) ───────── */}
-      {!sessionActive && (
-        <JourneyPresets onSelectPreset={handlePresetSelected} />
-      )}
-
-      {/* ─── Session Status Card ────────────────────────────── */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: dynamicStyles.cardBg,
-            borderColor: sessionActive ? COLORS.primary : dynamicStyles.borderCol,
-          },
-        ]}
-      >
-        <View style={styles.cardHeaderRow}>
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: sessionActive
-                  ? COLORS.primaryLight
-                  : isDark
-                  ? '#2B383C'
-                  : '#E6ECEB',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: sessionActive ? COLORS.primary : COLORS.textMuted,
-                },
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusPillText,
-                {
-                  color: sessionActive ? COLORS.primaryDark : dynamicStyles.secondaryText,
-                },
-              ]}
-            >
-              {sessionActive ? 'SESSION ACTIVE' : 'NO ACTIVE SESSION'}
-            </Text>
+      <View style={styles.session}>
+        <View style={styles.sessionIntro}>
+          <View style={{flex: 1}}>
+            <Text style={styles.kicker}>Safety session</Text>
+        <Text accessibilityRole="header" style={styles.headline}>{restoringSession ? 'Checking session…' : sessionActive ? 'Session in progress' : 'Ready to start'}</Text>
           </View>
-
-          {restoringSession ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          ) : null}
+          <SafetyRadar active={sessionActive}/>
         </View>
-
-        <Text style={[styles.cardHeadline, { color: dynamicStyles.textColor }]}>
-          {sessionActive
-            ? 'Safety tracking in progress'
-            : 'Step out with confidence'}
-        </Text>
-        <Text style={[styles.cardDescription, { color: dynamicStyles.secondaryText }]}>
-          {sessionActive
-            ? `Your location is shared with your trusted contacts until ${formatTime(
-                sessionExpiresAt,
-              )}.`
-            : 'Plan a safety session before traveling alone, commuting late, or entering unfamiliar areas.'}
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.sessionButton,
-            {
-              backgroundColor: sessionActive ? COLORS.danger : COLORS.primary,
-            },
-          ]}
-          onPress={sessionActive ? handleEndSessionPress : handleStartSessionPress}
-          disabled={locationBusy || restoringSession}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={
-            sessionActive ? 'End active safety session' : 'Start new safety session'
-          }
-        >
-          {locationBusy ? (
-            <ActivityIndicator color={COLORS.surface} />
-          ) : (
-            <Text style={styles.sessionButtonText}>
-              {sessionActive ? 'End safety session' : 'Start a safety session'}
-            </Text>
-          )}
+        <Text style={styles.description}>{sessionActive ? `Ends at ${formatTime(sessionExpiresAt)} · Next check-in ${formatTime(nextCheckInAt)}` : 'Share your location with selected family contacts by SMS.'}</Text>
+        <View style={styles.readings}>
+          <View style={styles.reading}><Text style={styles.readingLabel}>GPS accuracy</Text><Text style={styles.readingValue}>{sessionActive && lastLocation && lastLocation.accuracy > 0 ? '±' + Math.round(lastLocation.accuracy) + ' m' : sessionActive ? 'Awaiting fix' : 'Standby'}</Text></View>
+          <View style={styles.reading}><Text style={styles.readingLabel}>Family SMS</Text><Text style={styles.readingValue}>{familyContacts.filter(c => c.isSelected).length} selected</Text></View>
+        </View>
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{disabled: locationBusy || restoringSession}}
+          disabled={locationBusy || restoringSession} onPress={sessionActive ? handleCheckIn : handleStartSessionPress}
+          style={[styles.primary, {opacity: locationBusy || restoringSession ? 0.65 : 1}]}>
+          {locationBusy || restoringSession ? <ActivityIndicator color="#143E38"/> : <Text style={styles.primaryText}>{sessionActive ? 'Check in · I am okay' : 'Start safety session'}</Text>}
         </TouchableOpacity>
+        {sessionActive && <View style={styles.controls}>
+          <TouchableOpacity accessibilityRole="button" onPress={handleExtendSession} style={styles.secondary}><Text style={styles.secondaryText}>Extend 15 min</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={handleEndSessionPress} disabled={locationBusy} style={styles.secondary}><Text style={styles.secondaryText}>End session</Text></TouchableOpacity>
+        </View>}
       </View>
-
-      {/* ─── Status Labels ──────────────────────────────────── */}
-      <View
-        style={[
-          styles.infoTile,
-          { backgroundColor: dynamicStyles.cardBg, borderColor: dynamicStyles.borderCol },
-        ]}
-      >
-        <View style={styles.statusRow}>
-          <Text style={[styles.statusLabelTitle, { color: dynamicStyles.textColor }]}>
-            GPS Status:
-          </Text>
-          <Text
-            style={[styles.statusLabelVal, { color: COLORS.primary }]}
-            accessibilityLiveRegion="polite"
-          >
-            {locationStatusText}
-          </Text>
+      <SosButton onActivate={handleSosTriggered} disabled={sosBusy}/>
+      {sosBusy && <ActivityIndicator color={COLORS.danger} accessibilityLabel="Sending SOS"/>}
+      {sessionActive && <View style={[styles.row, {borderColor: dynamicStyles.borderCol}]}>
+        <Text style={[styles.rowTitle, {color: dynamicStyles.textColor}]}>Location</Text>
+        <Text style={[styles.rowDetail, {color: dynamicStyles.secondaryText}]}>{locationStatusText}</Text>
+      </View>}
+      <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Contacts')}
+        style={[styles.row, {borderColor: dynamicStyles.borderCol}]}>
+        <View style={styles.rowBody}>
+          <Text style={[styles.rowTitle, {color: dynamicStyles.textColor}]}>Trusted contacts</Text>
+          <Text style={[styles.caption, {color: dynamicStyles.secondaryText}]}>{contactsCount ? `${contactsCount} configured` : 'Add or select family contacts'}</Text>
         </View>
-
-        <View style={[styles.divider, { backgroundColor: dynamicStyles.borderCol }]} />
-
-        <View style={styles.statusRow}>
-          <Text style={[styles.statusLabelTitle, { color: dynamicStyles.textColor }]}>
-            Next Check-in:
-          </Text>
-          <Text
-            style={[styles.statusLabelVal, { color: dynamicStyles.textColor }]}
-            accessibilityLiveRegion="polite"
-          >
-            {sessionActive ? formatTime(nextCheckInAt) : 'Inactive'}
-          </Text>
-        </View>
-      </View>
-
-      {/* ─── Check-In Action Button ─────────────────────────── */}
-      <TouchableOpacity
-        style={[
-          styles.checkInButton,
-          {
-            backgroundColor: sessionActive ? COLORS.accent : isDark ? '#233034' : '#DDE6E4',
-          },
-        ]}
-        onPress={handleCheckIn}
-        disabled={!sessionActive || locationBusy}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Check in to confirm you are safe"
-      >
-        <Text
-          style={[
-            styles.checkInButtonText,
-            { color: sessionActive ? COLORS.surface : COLORS.textMuted },
-          ]}
-        >
-          ✓ Check In (I Am Safe)
-        </Text>
+        <Text style={[styles.arrow, {color: dynamicStyles.secondaryText}]}>›</Text>
       </TouchableOpacity>
-
-      {/* ─── Manage Contacts Card ───────────────────────────── */}
-      <TouchableOpacity
-        style={[
-          styles.card,
-          styles.contactsCard,
-          {
-            backgroundColor: dynamicStyles.cardBg,
-            borderColor: dynamicStyles.borderCol,
-          },
-        ]}
-        onPress={() => navigation.navigate('Contacts')}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Manage trusted contacts"
-      >
-        <View>
-          <Text style={[styles.cardHeadline, { color: dynamicStyles.textColor }]}>
-            Add someone you trust
-          </Text>
-          <Text style={[styles.cardDescription, { color: dynamicStyles.secondaryText }]}>
-            Invite family and friends to receive automated alerts and check-in notices.
-          </Text>
-        </View>
-        <Text style={[styles.navArrow, { color: COLORS.primary }]}>➔</Text>
-      </TouchableOpacity>
-
-      {/* ─── Safety-Critical SOS Button ─────────────────────── */}
-      <View style={styles.sosContainer}>
-        <SosButton
-          onActivate={handleSosTriggered}
-          disabled={sosBusy}
-        />
-        {sosBusy ? (
-          <ActivityIndicator
-            size="small"
-            color={COLORS.danger}
-            style={styles.sosIndicator}
-          />
-        ) : null}
-      </View>
-
-      {/* ─── Footer Disclaimer ──────────────────────────────── */}
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: dynamicStyles.secondaryText }]}>
-          Emergency alerts and stationary warnings are transmitted directly to your selected
-          family contacts via SIM cellular network. In immediate danger, call national
-          emergency response (112) directly.
-        </Text>
-      </View>
+      <QuickToolsBar onOpenSiren={() => setShowSiren(true)} onOpenFakeCall={() => setShowFakeCall(true)}
+        onOpenHelpline={() => setShowHelplines(true)} onShareQuickPin={handleShareQuickPin}/>
+      {!sessionActive && <JourneyPresets onSelectPreset={handlePresetSelected}/>}
+      <Text style={[styles.caption, {color: dynamicStyles.secondaryText}]}>In immediate danger, call 112.</Text>
 
       {/* ─── Interactive Safety Modals ───────────────────────── */}
       <SirenModal
@@ -895,173 +707,30 @@ export const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    marginTop: Platform.OS === 'android' ? 10 : 0,
-  },
-  headerBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  headerTitleWrap: {
-    flex: 1,
-  },
-  brandTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  brandSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  accountButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1.5,
-  },
-  accountButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  card: {
-    padding: 20,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  cardHeadline: {
-    fontSize: 19,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  cardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 18,
-  },
-  sessionButton: {
-    height: 50,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sessionButtonText: {
-    color: COLORS.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  infoTile: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  statusLabelTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statusLabelVal: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 8,
-  },
-  checkInButton: {
-    height: 52,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  checkInButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  contactsCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 18,
-  },
-  navArrow: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  sosContainer: {
-    marginTop: 8,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  sosIndicator: {
-    marginTop: 8,
-  },
-  footer: {
-    marginTop: 10,
-    paddingHorizontal: 12,
-  },
-  footerText: {
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
+  container: {flex: 1},
+  scrollContent: {paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, gap: 14, width: '100%', maxWidth: 640, alignSelf: 'center'},
+  header: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  logo: {width: 32, height: 32, borderRadius: 8},
+  brand: {flex: 1, fontSize: 21, fontWeight: '700', letterSpacing: -0.6},
+  account: {minHeight: 48, justifyContent: 'center', paddingHorizontal: 8},
+  session: {backgroundColor: '#173D39', borderRadius: 16, padding: 20},
+  sessionIntro: {flexDirection:'row',alignItems:'center',gap:12,marginBottom:6},
+  readings:{marginTop:14,paddingTop:12,borderTopWidth:1,borderColor:'#406059',flexDirection:'row',gap:14},
+  reading:{flex:1,gap:2}, readingLabel:{color:'#C1D8CF',fontSize:12}, readingValue:{fontSize:16,color:'#FFFFFF',fontWeight:'600',fontVariant:['tabular-nums']},
+  kicker: {fontSize: 14, color: '#C2DAD5', fontWeight: '500'},
+  headline: {color: '#FFFFFF', fontSize: 28, fontWeight: '600', letterSpacing: -0.7, marginVertical: 6},
+  description: {color: '#D6E5E1', fontSize: 15, lineHeight: 22},
+  primary: {minHeight: 50, marginTop: 20, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#E2F1EC'},
+  primaryText: {fontSize: 16, color: '#143E38', fontWeight: '700'},
+  controls: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'},
+  secondary: {minHeight: 48, justifyContent: 'center', paddingHorizontal: 4},
+  secondaryText: {color: '#E2F1EC', fontSize: 15, fontWeight: '600'},
+  row: {flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1},
+  rowBody: {flex: 1, gap: 3},
+  rowTitle: {fontSize: 16, fontWeight: '600'},
+  rowDetail: {flex: 1, textAlign: 'right', fontSize: 14},
+  caption: {fontSize: 14, lineHeight: 20},
+  arrow: {fontSize: 24},
 });
 
 export default HomeScreen;

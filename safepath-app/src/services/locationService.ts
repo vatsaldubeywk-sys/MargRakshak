@@ -71,9 +71,11 @@ const locationService = {
     durationMinutes: number,
     nextCheckInAt: string | null | undefined,
     expiresAt: string,
+    phones: string[] = [],
   ): void {
     // Stop any previous tracking first.
-    locationService.stopTracking();
+    nativeSubscription?.remove();
+    if (watchId !== null) Geolocation.clearWatch(watchId);
 
     // ── Android native foreground service ──
     if (Platform.OS === 'android' && LocationModule?.startService) {
@@ -83,6 +85,7 @@ const locationService = {
         durationMinutes,
         nextMs,
         expMs,
+        phones,
       );
 
       // Listen for samples pushed from the native module.
@@ -99,6 +102,7 @@ const locationService = {
       );
     }
 
+    if (Platform.OS === 'android') return;
     // ── JS-side watchPosition (fallback / iOS) ──
     watchId = Geolocation.watchPosition(
       position => emit(toSample(position)),
@@ -112,6 +116,10 @@ const locationService = {
         fastestInterval: 10_000,
       },
     );
+  },
+
+  updateSession(expiry: number, checkIn: boolean): void {
+    LocationModule?.updateSession(expiry, checkIn);
   },
 
   /** Stop all location tracking. */

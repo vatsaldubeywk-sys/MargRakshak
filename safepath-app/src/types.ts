@@ -30,6 +30,7 @@ export interface CreateContactResult {
 // ─── Sessions ──────────────────────────────────────────────────────
 
 export interface StartSessionResult {
+  phones?: string[];
   sessionId: string;
   expiresAt: string;
   nextCheckInAt: string;

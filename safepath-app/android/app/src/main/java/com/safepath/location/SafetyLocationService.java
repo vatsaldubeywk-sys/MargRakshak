@@ -71,6 +71,7 @@ public class SafetyLocationService extends Service implements LocationListener {
     private LocationManager mLocationManager;
     private NotificationManager mNotificationManager;
     private Handler mHandler;
+    private FamilyMonitor monitor;
 
     private Runnable mExpiryRunnable;
     private Runnable mCheckInReminderRunnable;
@@ -88,6 +89,7 @@ public class SafetyLocationService extends Service implements LocationListener {
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
         createNotificationChannels();
+        monitor = new FamilyMonitor(this);
         initLocationCallback();
     }
 
@@ -99,6 +101,21 @@ public class SafetyLocationService extends Service implements LocationListener {
         }
 
         String action = intent.getAction();
+        if (FamilyMonitor.OK.equals(action)) {
+            if (!isRunning) recoverFromRestart();
+            if (isRunning) monitor.acknowledge(intent.getLongExtra("deadline", 0));
+            return START_STICKY;
+        }
+        if ("update".equals(action) && isRunning) {
+            if (intent.getBooleanExtra("checkIn", false)) monitor.resetPrompt();
+            long expiry = intent.getLongExtra("expiry", 0);
+            if (expiry > System.currentTimeMillis()) {
+                monitor.extend(expiry);
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putLong(PREF_KEY_EXPIRES_AT, expiry).apply();
+                scheduleExpiry(expiry);
+            }
+            return START_STICKY;
+        }
         if (ACTION_STOP.equals(action)) {
             Log.d(TAG, "Received ACTION_STOP");
             stopTrackingAndSelf();
@@ -128,6 +145,7 @@ public class SafetyLocationService extends Service implements LocationListener {
             }
 
             startForegroundWithNotification();
+            monitor.start(intent.getStringArrayListExtra("phones"), expiresAtMs);
             saveSessionState(nextCheckInAtMs, expiresAtMs);
             scheduleExpiry(expiresAtMs);
             scheduleCheckInReminder(nextCheckInAtMs);
@@ -221,7 +239,7 @@ public class SafetyLocationService extends Service implements LocationListener {
                     15_000L // 15 seconds desired interval
             )
                     .setMinUpdateIntervalMillis(5_000L) // 5 seconds fastest interval
-                    .setMinUpdateDistanceMeters(10.0f)  // 10 meters min distance
+                    .setMinUpdateDistanceMeters(0.0f)  // 10 meters min distance
                     .build();
 
             mFusedLocationClient.requestLocationUpdates(
@@ -252,7 +270,7 @@ public class SafetyLocationService extends Service implements LocationListener {
                 mLocationManager.requestLocationUpdates(
                         LocationManager.GPS_PROVIDER,
                         15_000L,
-                        10.0f,
+                        0.0f,
                         this,
                         Looper.getMainLooper()
                 );
@@ -260,7 +278,7 @@ public class SafetyLocationService extends Service implements LocationListener {
                 mLocationManager.requestLocationUpdates(
                         LocationManager.NETWORK_PROVIDER,
                         15_000L,
-                        10.0f,
+                        0.0f,
                         this,
                         Looper.getMainLooper()
                 );
@@ -273,6 +291,7 @@ public class SafetyLocationService extends Service implements LocationListener {
     }
 
     private void broadcastLocation(Location location) {
+        monitor.sample(location);
         ReactContext reactContext = getEffectiveReactContext();
         if (reactContext == null) {
             Log.d(TAG, "ReactContext not ready yet to receive location update");
@@ -413,6 +432,7 @@ public class SafetyLocationService extends Service implements LocationListener {
         }
 
         startForegroundWithNotification();
+        monitor.resume();
         scheduleExpiry(expiresAtMs);
         if (nextCheckInAtMs > now) {
             scheduleCheckInReminder(nextCheckInAtMs);
@@ -423,6 +443,7 @@ public class SafetyLocationService extends Service implements LocationListener {
 
     private void stopTrackingAndSelf() {
         isRunning = false;
+        monitor.stop();
         clearSessionState();
 
         if (mExpiryRunnable != null) {

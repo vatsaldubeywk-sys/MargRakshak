@@ -47,11 +47,14 @@ public class LocationModule extends ReactContextBaseJavaModule {
      * @param expiresAtMs Timestamp (UTC ms) when the safety session expires
      */
     @ReactMethod
-    public void startService(int durationMinutes, double nextCheckInAtMs, double expiresAtMs) {
+    public void startService(int durationMinutes, double nextCheckInAtMs, double expiresAtMs, com.facebook.react.bridge.ReadableArray phones) {
         ReactApplicationContext context = getReactApplicationContext();
         try {
             Intent intent = new Intent(context, SafetyLocationService.class);
             intent.setAction(SafetyLocationService.ACTION_START);
+            java.util.ArrayList<String> recipients = new java.util.ArrayList<>();
+            for (int i = 0; i < phones.size(); i++) recipients.add(phones.getString(i));
+            intent.putStringArrayListExtra("phones", recipients);
             intent.putExtra(SafetyLocationService.EXTRA_DURATION_MINUTES, durationMinutes);
             intent.putExtra(SafetyLocationService.EXTRA_NEXT_CHECK_IN_AT_MS, nextCheckInAtMs);
             intent.putExtra(SafetyLocationService.EXTRA_EXPIRES_AT_MS, expiresAtMs);
@@ -70,6 +73,15 @@ public class LocationModule extends ReactContextBaseJavaModule {
     /**
      * Stop the native Android foreground location tracking service.
      */
+    @ReactMethod
+    public void updateSession(double expiry, boolean checkIn) {
+        if (!SafetyLocationService.isRunning) return;
+        ReactApplicationContext context = getReactApplicationContext();
+        Intent intent = new Intent(context, SafetyLocationService.class).setAction("update");
+        intent.putExtra("expiry", (long) expiry).putExtra("checkIn", checkIn);
+        context.startService(intent);
+    }
+
     @ReactMethod
     public void stopService() {
         ReactApplicationContext context = getReactApplicationContext();

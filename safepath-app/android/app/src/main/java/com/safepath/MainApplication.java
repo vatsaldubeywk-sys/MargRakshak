@@ -24,7 +24,7 @@ public class MainApplication extends Application implements ReactApplication {
             new ReactNativeHost(this) {
                 @Override
                 public boolean getUseDeveloperSupport() {
-                    return BuildConfig.DEBUG;
+                    return false; // The distributed APK loads its embedded JavaScript bundle.
                 }
 
                 @Override
@@ -60,6 +60,10 @@ public class MainApplication extends Application implements ReactApplication {
     @Override
     public void onCreate() {
         super.onCreate();
-        SoLoader.init(this, /* native exopackage */ false);
+        try {
+            SoLoader.init(this, com.facebook.react.soloader.OpenSourceMergedSoMapping.INSTANCE);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Unable to initialize React Native libraries", e);
+        }
     }
 }

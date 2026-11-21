@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 import {AppRegistry} from 'react-native';
 import notifee from '@notifee/react-native';

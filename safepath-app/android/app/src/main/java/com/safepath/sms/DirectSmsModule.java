@@ -89,9 +89,9 @@ public class DirectSmsModule extends ReactContextBaseJavaModule {
 
             ArrayList<String> parts = smsManager.divideMessage(message);
             if (parts.size() > 1) {
-                smsManager.sendMultipartTextMessage(phoneNumber, null, parts, null, null);
+                smsManager.sendMultipartTextMessage(phoneNumber, null, parts, com.safepath.location.SmsResultReceiver.callbacks(getReactApplicationContext(), parts.size()), null);
             } else {
-                smsManager.sendTextMessage(phoneNumber, null, message, null, null);
+                smsManager.sendTextMessage(phoneNumber, null, message, com.safepath.location.SmsResultReceiver.callbacks(getReactApplicationContext(), 1).get(0), null);
             }
 
             Log.i(TAG, "Direct SIM SMS dispatched to " + phoneNumber + " (" + parts.size() + " part(s))");
@@ -140,9 +140,9 @@ public class DirectSmsModule extends ReactContextBaseJavaModule {
 
                 try {
                     if (parts.size() > 1) {
-                        smsManager.sendMultipartTextMessage(phone, null, parts, null, null);
+                        smsManager.sendMultipartTextMessage(phone, null, parts, com.safepath.location.SmsResultReceiver.callbacks(getReactApplicationContext(), parts.size()), null);
                     } else {
-                        smsManager.sendTextMessage(phone, null, message, null, null);
+                        smsManager.sendTextMessage(phone, null, message, com.safepath.location.SmsResultReceiver.callbacks(getReactApplicationContext(), 1).get(0), null);
                     }
                     sentCount++;
                     Log.i(TAG, "SIM SMS successfully sent to " + phone);

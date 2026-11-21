@@ -103,7 +103,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
         />
         <View style={styles.textContainer}>
           <Text style={styles.buttonText}>
-            {isHolding ? 'Holding... Keep pressed' : 'SOS · Hold 2.5s · I need help'}
+            {isHolding ? 'Keep holding…' : 'Hold for SOS  ·  2.5 seconds'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -114,19 +114,19 @@ export const SosButton: React.FC<SosButtonProps> = ({
 const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
-    marginVertical: 12,
+    marginVertical: 0,
   },
   button: {
     height: 58,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.27,
+    shadowOpacity: 0,
     shadowRadius: 4.65,
   },
   progressBar: {
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 16,
+    borderRadius: 12,
   },
   textContainer: {
     zIndex: 1,

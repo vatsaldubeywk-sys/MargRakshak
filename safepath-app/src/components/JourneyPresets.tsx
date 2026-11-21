@@ -68,10 +68,7 @@ export const JourneyPresets: React.FC<JourneyPresetsProps> = ({
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: isDark ? '#E2F1EC' : COLORS.textPrimary }]}>
-          ⚡ Quick Safety Presets
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: isDark ? '#98ABB0' : COLORS.textSecondary }]}>
-          One-tap configured journeys
+          Journey presets
         </Text>
       </View>
 
@@ -99,7 +96,7 @@ export const JourneyPresets: React.FC<JourneyPresetsProps> = ({
             accessibilityLabel={`Start preset ${preset.title} for ${preset.durationMinutes} minutes`}
           >
             <View style={styles.presetTopRow}>
-              <Text style={styles.presetIcon}>{preset.icon}</Text>
+              <Text accessible={false} style={{fontSize:22}}>{preset.icon}</Text>
               <View style={styles.presetBadge}>
                 <Text style={styles.presetBadgeText}>{preset.badge}</Text>
               </View>
@@ -127,7 +124,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
   sectionSubtitle: {
@@ -141,12 +138,12 @@ const styles = StyleSheet.create({
   presetCard: {
     width: 140,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0,
     shadowRadius: 4,
   },
   presetTopRow: {

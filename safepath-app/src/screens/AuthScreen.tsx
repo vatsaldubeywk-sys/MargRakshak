@@ -181,10 +181,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             accessibilityLabel="Marg Rakshak App Icon"
           />
           <Text style={[styles.brandHeaderTitle, { color: COLORS.primary }]}>
-            MARG RAKSHAK
-          </Text>
-          <Text style={[styles.brandHeaderSubtitle, { color: dynamicStyles.secondaryText }]}>
-            मार्ग रक्षक • Personal Safety Guardian
+            Marg Rakshak
           </Text>
         </View>
 
@@ -195,7 +192,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={[styles.subtitle, { color: dynamicStyles.secondaryText }]}>
             {signedInEmail
               ? `Currently signed in as ${signedInEmail}`
-              : 'Secure your sessions and notify your trusted contacts.'}
+              : 'Sign in for cloud features. Family SMS works without an account.'}
           </Text>
 
           {errorMessage ? (

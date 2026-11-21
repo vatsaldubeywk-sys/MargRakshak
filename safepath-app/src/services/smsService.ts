@@ -120,7 +120,7 @@ class SmsService {
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
         await Linking.openURL(url);
-        sentCount = phoneNumbers.length;
+        // The composer requires a manual send.
       }
     } catch {
       sentCount = 0;

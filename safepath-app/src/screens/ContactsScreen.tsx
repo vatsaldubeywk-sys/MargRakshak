@@ -198,7 +198,7 @@ export const ContactsScreen: React.FC<Props> = ({ navigation }) => {
               { color: isDark ? '#9CA3AF' : '#4B5563' },
             ]}
           >
-            📱 {item.phoneNumber}
+            {item.phoneNumber}
           </Text>
 
           <View style={styles.cardActionsRow}>
@@ -255,7 +255,6 @@ export const ContactsScreen: React.FC<Props> = ({ navigation }) => {
           { backgroundColor: isDark ? '#1F2937' : '#E6F4F1' },
         ]}
       >
-        <Text style={styles.bannerIcon}>📡</Text>
         <View style={styles.bannerTextContainer}>
           <Text
             style={[
@@ -263,7 +262,7 @@ export const ContactsScreen: React.FC<Props> = ({ navigation }) => {
               { color: isDark ? '#E2F1EC' : COLORS.primaryDark },
             ]}
           >
-            SIM Network Emergency Contacts
+            Family SMS contacts
           </Text>
           <Text
             style={[
@@ -271,8 +270,7 @@ export const ContactsScreen: React.FC<Props> = ({ navigation }) => {
               { color: isDark ? '#9CA3AF' : '#374151' },
             ]}
           >
-            Active contacts receive offline cellular SMS alerts with your live GPS location
-            if you stop moving or trigger SOS.
+            Choose who receives location updates and emergency alerts by SMS.
           </Text>
         </View>
       </View>

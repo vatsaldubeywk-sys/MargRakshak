@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
   ScrollView,
   useColorScheme,
 } from 'react-native';
@@ -18,6 +20,7 @@ import { COLORS } from '../constants';
 import authService from '../services/authService';
 import functionsService from '../services/functionsService';
 import familyContactsService from '../services/familyContactsService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import smsService from '../services/smsService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionSetup'>;
@@ -97,7 +100,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
     const selectedFamily = familyContacts.filter(c => c.isSelected);
     const selectedCloudIds = contacts.filter(c => c.isSelected).map(c => c.id);
 
-    if (selectedFamily.length === 0 && selectedCloudIds.length === 0) {
+    if (selectedFamily.length === 0) {
       Alert.alert(
         'Select at least 1 contact',
         'You must configure at least one active family contact to receive SIM SMS alerts when you need help.',
@@ -121,6 +124,16 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
 
+    if (Platform.OS === 'android') {
+      const p = PermissionsAndroid.PERMISSIONS;
+      const required = [p.ACCESS_COARSE_LOCATION, p.ACCESS_FINE_LOCATION, p.SEND_SMS];
+      const grants = await PermissionsAndroid.requestMultiple(required);
+      if (grants[p.ACCESS_FINE_LOCATION] !== 'granted' || grants[p.SEND_SMS] !== 'granted' ||
+          (Number(Platform.Version) >= 33 && await PermissionsAndroid.request(p.POST_NOTIFICATIONS) !== 'granted')) {
+        Alert.alert('Session requires permissions', 'Enable precise location, SMS and notifications in Android settings to start.');
+        return;
+      }
+    }
     setStartingSession(true);
 
     try {
@@ -144,6 +157,9 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
         // Offline-first mode: fallback to local session
       }
 
+      await AsyncStorage.setItem('family.quickStart', JSON.stringify({
+        minutes: durationMinutes, phones: selectedFamily.map(c => c.phoneNumber).sort(),
+      }));
       // Notify family contacts via SIM SMS
       if (selectedFamily.length > 0) {
         const startMsg = smsService.formatSessionStartSms(
@@ -154,7 +170,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
       }
 
       // Navigate back to Home with result params
-      navigation.navigate('Home', { sessionResult: result });
+      navigation.navigate('Home', { sessionResult: { ...result, phones: selectedFamily.map(c => c.phoneNumber) } });
     } catch (err: unknown) {
       const msg =
         typeof err === 'object' && err !== null && 'message' in err
@@ -186,8 +202,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
           Plan your session
         </Text>
         <Text style={[styles.subtitle, { color: dynamicStyles.secondaryText }]}>
-          Configure your journey duration, optional destination, and choose which
-          trusted contacts will accompany you digitally.
+          Choose how long to share your location and who receives updates.
         </Text>
       </View>
 
@@ -202,10 +217,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
         ]}
       >
         <Text style={[styles.sectionTitle, { color: dynamicStyles.textColor }]}>
-          Session Duration
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: dynamicStyles.secondaryText }]}>
-          Select anticipated travel time:
+          Duration
         </Text>
 
         <View style={styles.durationButtonGroup}>
@@ -228,6 +240,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
                 onPress={() => setDurationMinutes(mins)}
                 accessible={true}
                 accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
                 accessibilityLabel={`${mins} minutes duration`}
               >
                 <Text
@@ -362,7 +375,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text
                     style={[styles.contactEmail, { color: dynamicStyles.secondaryText }]}
                   >
-                    📱 {fc.phoneNumber}
+                    {fc.phoneNumber}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -402,7 +415,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text
                     style={[styles.contactEmail, { color: dynamicStyles.secondaryText }]}
                   >
-                    ✉️ {contact.invited_email}
+                    {contact.invited_email}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -445,7 +458,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
             style={[styles.consentText, { color: dynamicStyles.textColor }]}
           >
             I consent to Marg Rakshak accessing my real-time GPS coordinates and
-            broadcasting check-in and emergency alerts to my selected contacts
+            sending an SMS with my first GPS fix and every five minutes thereafter, plus emergency alerts, to my selected family. Carrier SMS charges may apply
             for the duration of this session.
           </Text>
         </TouchableOpacity>
@@ -457,7 +470,7 @@ export const SessionSetupScreen: React.FC<Props> = ({ navigation, route }) => {
           styles.startButton,
           {
             backgroundColor:
-              startingSession || !hasConsented || contacts.filter(c => c.isSelected).length === 0
+              startingSession || !hasConsented || !familyContacts.some(c => c.isSelected)
                 ? isDark
                   ? '#2B3B3E'
                   : '#B4D2CB'

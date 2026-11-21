@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View,
+  Image,
+  Pressable,
   Text,
-  TouchableOpacity,
   StyleSheet,
   useColorScheme,
 } from 'react-native';
@@ -23,168 +24,41 @@ export const QuickToolsBar: React.FC<QuickToolsBarProps> = ({
 }) => {
   const isDark = useColorScheme() === 'dark';
 
+  const tools = [
+    {label: 'Siren', icon:require('../assets/tool-siren.png'), hint:'Strobe and vibration', ink:'#85432B', tint:'#F5E5DA', action: onOpenSiren},
+    {label: 'Simulate a call', icon:require('../assets/tool-phone.png'), hint:'Incoming call screen', ink:'#3C537B', tint:'#E3EAF6', action: onOpenFakeCall},
+    {label: 'Helplines', icon:require('../assets/tool-helpline.png'), hint:'Emergency numbers', ink:'#684C6B', tint:'#F0E6EF', action: onOpenHelpline},
+    {label: 'Share location pin', icon:require('../assets/tool-pin.png'), hint:'Send your last GPS pin', ink:'#246357', tint:'#DEEEE8', action: onShareQuickPin},
+  ];
+  const textColor = isDark ? '#E2F1EC' : COLORS.textPrimary;
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: isDark ? '#E2F1EC' : COLORS.textPrimary }]}>
-        🛠️ Emergency Toolkit
-      </Text>
-
+      <Text accessibilityRole="header" style={[styles.title, {color: textColor}]}>Safety tools</Text>
       <View style={styles.grid}>
-        {/* Siren / Loud Alarm */}
-        <TouchableOpacity
-          style={[
-            styles.toolCard,
-            {
-              backgroundColor: isDark ? '#2D1616' : '#FDF2F2',
-              borderColor: isDark ? '#7F1D1D' : '#FCA5A5',
-            },
-          ]}
-          onPress={onOpenSiren}
-          activeOpacity={0.7}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Activate deterrent siren alarm"
-        >
-          <View style={[styles.iconCircle, { backgroundColor: '#EF4444' }]}>
-            <Text style={styles.toolIcon}>📢</Text>
-          </View>
-          <Text style={[styles.toolTitle, { color: isDark ? '#FCA5A5' : '#991B1B' }]}>
-            Siren Alarm
-          </Text>
-          <Text style={[styles.toolDesc, { color: isDark ? '#F87171' : '#B91C1C' }]}>
-            Strobe & noise
-          </Text>
-        </TouchableOpacity>
-
-        {/* Discreet Fake Call */}
-        <TouchableOpacity
-          style={[
-            styles.toolCard,
-            {
-              backgroundColor: isDark ? '#142533' : '#F0F9FF',
-              borderColor: isDark ? '#0369A1' : '#BAE6FD',
-            },
-          ]}
-          onPress={onOpenFakeCall}
-          activeOpacity={0.7}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Trigger simulated fake incoming phone call"
-        >
-          <View style={[styles.iconCircle, { backgroundColor: '#0284C7' }]}>
-            <Text style={styles.toolIcon}>📱</Text>
-          </View>
-          <Text style={[styles.toolTitle, { color: isDark ? '#7DD3FC' : '#075985' }]}>
-            Fake Call
-          </Text>
-          <Text style={[styles.toolDesc, { color: isDark ? '#38BDF8' : '#0369A1' }]}>
-            Exit safely
-          </Text>
-        </TouchableOpacity>
-
-        {/* India Helplines */}
-        <TouchableOpacity
-          style={[
-            styles.toolCard,
-            {
-              backgroundColor: isDark ? '#221933' : '#FAF5FF',
-              borderColor: isDark ? '#6B21A8' : '#E9D5FF',
-            },
-          ]}
-          onPress={onOpenHelpline}
-          activeOpacity={0.7}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Open official emergency helplines directory"
-        >
-          <View style={[styles.iconCircle, { backgroundColor: '#9333EA' }]}>
-            <Text style={styles.toolIcon}>🇮🇳</Text>
-          </View>
-          <Text style={[styles.toolTitle, { color: isDark ? '#D8B4FE' : '#6B21A8' }]}>
-            Helplines
-          </Text>
-          <Text style={[styles.toolDesc, { color: isDark ? '#C084FC' : '#7E22CE' }]}>
-            112 · 1091 · 181
-          </Text>
-        </TouchableOpacity>
-
-        {/* Instant Pin Share */}
-        <TouchableOpacity
-          style={[
-            styles.toolCard,
-            {
-              backgroundColor: isDark ? '#122B22' : '#F0FDF4',
-              borderColor: isDark ? '#166534' : '#BBF7D0',
-            },
-          ]}
-          onPress={onShareQuickPin}
-          activeOpacity={0.7}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Copy instant GPS location pin to clipboard"
-        >
-          <View style={[styles.iconCircle, { backgroundColor: '#16A34A' }]}>
-            <Text style={styles.toolIcon}>📍</Text>
-          </View>
-          <Text style={[styles.toolTitle, { color: isDark ? '#86EFAC' : '#166534' }]}>
-            Quick Pin
-          </Text>
-          <Text style={[styles.toolDesc, { color: isDark ? '#4ADE80' : '#15803D' }]}>
-            Copy location
-          </Text>
-        </TouchableOpacity>
+        {tools.map(tool => (
+          <Pressable key={tool.label} accessibilityHint={tool.hint} accessibilityRole="button" onPress={tool.action}
+            style={({pressed}) => [styles.tool, {opacity: pressed ? 0.76 : 1, transform:[{scale:pressed ? 0.98 : 1}]}, {backgroundColor: isDark ? '#1A2427' : COLORS.surface, borderColor: isDark ? '#344549' : COLORS.border}]}>
+            <View style={styles.iconLine}>
+              <View style={[styles.iconTile,{backgroundColor:tool.tint}]}><Image source={tool.icon} style={{width:23,height:23,tintColor:tool.ink}}/></View>
+              <Text style={{color:isDark ? '#AEBFB8' : '#64766F'}}>›</Text>
+            </View>
+            <Text style={[styles.label, {color: textColor}]}>{tool.label}</Text>
+            <Text style={{color: isDark ? '#ADBBB7' : COLORS.textSecondary, fontSize:13, lineHeight:18}}>{tool.hint}</Text>
+          </Pressable>
+        ))}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    marginBottom: 12,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  toolCard: {
-    width: '48%',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  toolIcon: {
-    fontSize: 20,
-  },
-  toolTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  toolDesc: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
+  container: {gap: 10},
+  title: {fontSize: 17, fontWeight: '600'},
+  grid: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  tool: {flexBasis: '47%', flexGrow: 1, gap: 4, minHeight: 105, padding: 12, borderWidth: 1, borderRadius: 10},
+  iconLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:5},
+  iconTile:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  label: { fontSize: 15, fontWeight: '500', paddingRight: 6},
 });
 
 export default QuickToolsBar;
