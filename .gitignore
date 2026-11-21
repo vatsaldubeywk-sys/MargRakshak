@@ -5,6 +5,8 @@ backend/supabase/.env.*
 backend/supabase/functions/.env
 backend/supabase/.temp/
 backend/supabase/.supabase/
+supabase/.temp/
+supabase/.supabase/
 
 # Local environment and credentials
 .env
@@ -15,6 +17,7 @@ backend/supabase/.supabase/
 # Generated build and package output
 **/bin/
 **/obj/
+**/build/
 **/node_modules/
 .vs/
 *.user
@@ -24,3 +27,7 @@ backend/supabase/.supabase/
 *.pfx
 *.keystore
 *.jks
+.gradle/
+**/.gradle/
+android-sdk/
+*.log

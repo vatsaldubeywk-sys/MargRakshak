@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Sky Gradient -->
+    <linearGradient id="skyGradB" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF" />
+      <stop offset="50%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#E0F2FE" />
+    </linearGradient>
+
+    <!-- Outer Shield Rim -->
+    <linearGradient id="badgeRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="50%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+
+    <!-- Hill Left Gradient -->
+    <linearGradient id="hillLeftB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <!-- Hill Right Gradient -->
+    <linearGradient id="hillRightB" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+
+    <!-- Path / Road Gradient -->
+    <linearGradient id="pathGradB" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="70%" stop-color="#F1F5F9" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <!-- House Roof Gradient -->
+    <linearGradient id="roofGradB" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#EF4444" />
+      <stop offset="100%" stop-color="#B91C1C" />
+    </linearGradient>
+
+    <radialGradient id="doorLightB" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </radialGradient>
+
+    <filter id="badgeShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+
+    <clipPath id="circleClipB">
+      <circle cx="256" cy="256" r="236" />
+    </clipPath>
+  </defs>
+
+  <!-- Outer Protective Ring -->
+  <g filter="url(#badgeShadow)">
+    <circle cx="256" cy="256" r="248" fill="url(#badgeRim)" />
+    <circle cx="256" cy="256" r="238" fill="#0284C7" />
+
+    <!-- Clipped Landscape -->
+    <g clip-path="url(#circleClipB)">
+      <!-- Sky -->
+      <rect x="18" y="18" width="476" height="476" fill="url(#skyGradB)" />
+      
+      <!-- Horizon Glow -->
+      <circle cx="256" cy="225" r="100" fill="#FEF08A" opacity="0.22" />
+
+      <!-- Minimalist Clouds -->
+      <path d="M90 170 C90 158 102 150 114 152 C121 140 140 140 148 152 C157 150 169 158 169 170 Z" fill="#FFFFFF" opacity="0.75" />
+      <path d="M340 180 C340 170 350 162 360 164 C366 154 382 154 388 164 C396 162 406 170 406 180 Z" fill="#FFFFFF" opacity="0.75" />
+
+      <!-- Horizon Trees -->
+      <circle cx="80" cy="216" r="20" fill="#047857" opacity="0.9" />
+      <circle cx="110" cy="222" r="16" fill="#10B981" opacity="0.9" />
+      <rect x="78" y="228" width="4" height="16" fill="#064E3B" />
+      <rect x="108" y="232" width="4" height="12" fill="#064E3B" />
+
+      <circle cx="430" cy="216" r="20" fill="#047857" opacity="0.9" />
+      <circle cx="400" cy="222" r="16" fill="#10B981" opacity="0.9" />
+      <rect x="428" y="228" width="4" height="16" fill="#064E3B" />
+      <rect x="398" y="232" width="4" height="12" fill="#064E3B" />
+
+      <!-- Left Field -->
+      <path d="M18 238 Q140 232 234 240 L216 494 L18 494 Z" fill="url(#hillLeftB)" />
+      <path d="M50 265 Q145 272 220 330" stroke="#047857" stroke-width="2.5" fill="none" opacity="0.35" />
+      <path d="M35 315 Q130 330 205 395" stroke="#047857" stroke-width="3" fill="none" opacity="0.35" />
+      <path d="M22 375 Q115 395 180 470" stroke="#047857" stroke-width="3.5" fill="none" opacity="0.35" />
+
+      <!-- Right Field -->
+      <path d="M494 238 Q372 232 278 240 L296 494 L494 494 Z" fill="url(#hillRightB)" />
+      <path d="M462 265 Q367 272 292 330" stroke="#064E3B" stroke-width="2.5" fill="none" opacity="0.35" />
+      <path d="M477 315 Q382 330 307 395" stroke="#064E3B" stroke-width="3" fill="none" opacity="0.35" />
+      <path d="M490 375 Q397 395 332 470" stroke="#064E3B" stroke-width="3.5" fill="none" opacity="0.35" />
+
+      <!-- Road / Path ("Marg") -->
+      <polygon points="244,236 268,236 324,494 188,494" fill="url(#pathGradB)" />
+      <polygon points="254,240 258,240 260,494 252,494" fill="#10B981" opacity="0.6" />
+
+      <!-- Perspective Fences -->
+      <!-- Left Rails -->
+      <path d="M242 238 L185 494" stroke="#FFFFFF" stroke-width="4" fill="none" />
+      <path d="M241 245 L177 494" stroke="#E2E8F0" stroke-width="5" fill="none" />
+      <!-- Left Posts -->
+      <line x1="242" y1="235" x2="242" y2="245" stroke="#FFFFFF" stroke-width="2.5" />
+      <line x1="236" y1="250" x2="235" y2="265" stroke="#FFFFFF" stroke-width="3" />
+      <line x1="228" y1="272" x2="227" y2="293" stroke="#FFFFFF" stroke-width="3.5" />
+      <line x1="217" y1="306" x2="215" y2="333" stroke="#FFFFFF" stroke-width="4.5" />
+      <line x1="202" y1="352" x2="199" y2="388" stroke="#FFFFFF" stroke-width="6" />
+      <line x1="184" y1="412" x2="180" y2="462" stroke="#FFFFFF" stroke-width="7.5" />
+
+      <!-- Right Rails -->
+      <path d="M270 238 L327 494" stroke="#FFFFFF" stroke-width="4" fill="none" />
+      <path d="M271 245 L335 494" stroke="#E2E8F0" stroke-width="5" fill="none" />
+      <!-- Right Posts -->
+      <line x1="270" y1="235" x2="270" y2="245" stroke="#FFFFFF" stroke-width="2.5" />
+      <line x1="276" y1="250" x2="277" y2="265" stroke="#FFFFFF" stroke-width="3" />
+      <line x1="284" y1="272" x2="285" y2="293" stroke="#FFFFFF" stroke-width="3.5" />
+      <line x1="295" y1="306" x2="297" y2="333" stroke="#FFFFFF" stroke-width="4.5" />
+      <line x1="310" y1="352" x2="313" y2="388" stroke="#FFFFFF" stroke-width="6" />
+      <line x1="328" y1="412" x2="332" y2="462" stroke="#FFFFFF" stroke-width="7.5" />
+
+      <!-- Safe Haven Home -->
+      <g>
+        <rect x="216" y="214" width="80" height="28" rx="2" fill="#F8FAFC" />
+        <rect x="236" y="202" width="40" height="40" fill="#FFFFFF" />
+
+        <!-- Roofs -->
+        <polygon points="256,180 230,206 282,206" fill="url(#roofGradB)" />
+        <polygon points="232,206 210,216 236,216" fill="#DC2626" />
+        <polygon points="280,206 302,216 276,216" fill="#B91C1C" />
+
+        <!-- Watchtowers / Spires -->
+        <rect x="238" y="168" width="9" height="14" fill="#F8FAFC" />
+        <polygon points="242.5,156 236,168 249,168" fill="#DC2626" />
+        <rect x="265" y="168" width="9" height="14" fill="#F8FAFC" />
+        <polygon points="269.5,156 263,168 276,168" fill="#DC2626" />
+
+        <!-- Doorway -->
+        <rect x="249" y="224" width="14" height="18" rx="7" fill="url(#doorLightB)" />
+        <rect x="223" y="220" width="7" height="9" rx="1" fill="#FEF08A" />
+        <rect x="282" y="220" width="7" height="9" rx="1" fill="#FEF08A" />
+      </g>
+    </g>
+  </g>
+</svg>

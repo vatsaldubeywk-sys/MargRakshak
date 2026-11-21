@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Squircle Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <!-- Outer Rim Glow -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#10B981" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#0284C7" stop-opacity="0.1" />
+    </linearGradient>
+
+    <!-- Sky Gradient -->
+    <linearGradient id="skyGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="45%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#BAE6FD" />
+    </linearGradient>
+
+    <!-- Hill Left Gradient -->
+    <linearGradient id="hillLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <!-- Hill Right Gradient -->
+    <linearGradient id="hillRight" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+
+    <!-- Path / Road Gradient (Radiant & Protected) -->
+    <linearGradient id="pathGrad" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F1F5F9" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <!-- Path Center Dash Glow -->
+    <linearGradient id="pathGlow" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- House Roof Gradient (Iconic Red / Crimson) -->
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#EF4444" />
+      <stop offset="100%" stop-color="#B91C1C" />
+    </linearGradient>
+
+    <!-- Safe Warm Light for Doorway -->
+    <radialGradient id="doorLight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </radialGradient>
+
+    <!-- Shadow filter for clean depth -->
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+
+    <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Circle Clip for the Pastoral Vignette -->
+    <clipPath id="circleClip">
+      <circle cx="256" cy="256" r="204" />
+    </clipPath>
+  </defs>
+
+  <!-- App Icon Squircle Background (iOS/Android market standard 512x512) -->
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="url(#bgGrad)" />
+
+  <!-- Outer Protective Halo / Shield Accent -->
+  <circle cx="256" cy="256" r="214" fill="none" stroke="url(#rimGrad)" stroke-width="4" />
+  <circle cx="256" cy="256" r="206" fill="none" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="1.5" />
+
+  <!-- Main Circular Emblem with Shadow -->
+  <g filter="url(#softShadow)">
+    <circle cx="256" cy="256" r="204" fill="#0284C7" />
+
+    <!-- Clipped Landscape Scene -->
+    <g clip-path="url(#circleClip)">
+      <!-- 1. Sky & Sun Atmosphere -->
+      <rect x="52" y="52" width="408" height="408" fill="url(#skyGrad)" />
+      
+      <!-- Subtle Sun / Horizon Glow -->
+      <circle cx="256" cy="235" r="90" fill="#FEF08A" opacity="0.25" filter="url(#glowFilter)" />
+
+      <!-- Minimalist Clouds -->
+      <path d="M120 185 C120 175 130 168 140 170 C146 160 162 160 168 170 C176 168 186 175 186 185 Z" fill="#FFFFFF" opacity="0.65" />
+      <path d="M330 195 C330 186 338 180 348 182 C353 174 366 174 371 182 C378 180 388 186 388 195 Z" fill="#FFFFFF" opacity="0.65" />
+
+      <!-- Tree silhouettes on horizon -->
+      <!-- Left Trees -->
+      <circle cx="108" cy="225" r="18" fill="#047857" opacity="0.85" />
+      <circle cx="132" cy="232" r="14" fill="#10B981" opacity="0.85" />
+      <rect x="106" y="235" width="4" height="15" fill="#064E3B" />
+      <rect x="130" y="240" width="3" height="10" fill="#064E3B" />
+
+      <!-- Right Trees -->
+      <circle cx="400" cy="228" r="17" fill="#047857" opacity="0.85" />
+      <circle cx="376" cy="235" r="13" fill="#10B981" opacity="0.85" />
+      <rect x="398" y="238" width="4" height="12" fill="#064E3B" />
+      <rect x="374" y="242" width="3" height="8" fill="#064E3B" />
+
+      <!-- 2. Rolling Green Fields (Left and Right) -->
+      <!-- Left Field with depth contour -->
+      <path d="M52 245 Q150 240 236 248 L220 460 L52 460 Z" fill="url(#hillLeft)" />
+      <!-- Left Field furrow texture lines -->
+      <path d="M80 270 Q160 275 224 330" stroke="#047857" stroke-width="2" fill="none" opacity="0.4" />
+      <path d="M65 310 Q145 325 210 390" stroke="#047857" stroke-width="2.5" fill="none" opacity="0.4" />
+      <path d="M55 360 Q130 380 185 450" stroke="#047857" stroke-width="3" fill="none" opacity="0.4" />
+
+      <!-- Right Field with depth contour -->
+      <path d="M460 245 Q362 240 276 248 L292 460 L460 460 Z" fill="url(#hillRight)" />
+      <!-- Right Field furrow texture lines -->
+      <path d="M432 270 Q352 275 288 330" stroke="#064E3B" stroke-width="2" fill="none" opacity="0.4" />
+      <path d="M447 310 Q367 325 302 390" stroke="#064E3B" stroke-width="2.5" fill="none" opacity="0.4" />
+      <path d="M457 360 Q382 380 327 450" stroke="#064E3B" stroke-width="3" fill="none" opacity="0.4" />
+
+      <!-- 3. The Guided Safe Path ("Marg") -->
+      <!-- Perspective road widening from house to bottom -->
+      <polygon points="246,245 266,245 314,460 198,460" fill="url(#pathGrad)" />
+      <!-- Center Guidance Line / Beacon Glow -->
+      <polygon points="254,248 258,248 260,460 252,460" fill="url(#pathGlow)" />
+
+      <!-- 4. Protective Guidance Fences (Left & Right Perspective) -->
+      <!-- Left Fence Posts & Rails -->
+      <!-- Rails -->
+      <path d="M244 246 L195 460" stroke="#FFFFFF" stroke-width="3.5" fill="none" opacity="0.95" />
+      <path d="M243 252 L188 460" stroke="#E2E8F0" stroke-width="4.5" fill="none" opacity="0.9" />
+      <!-- Posts Left -->
+      <line x1="244" y1="243" x2="244" y2="252" stroke="#FFFFFF" stroke-width="2" />
+      <line x1="239" y1="256" x2="238" y2="270" stroke="#FFFFFF" stroke-width="2.5" />
+      <line x1="232" y1="277" x2="231" y2="296" stroke="#FFFFFF" stroke-width="3" />
+      <line x1="223" y1="307" x2="221" y2="332" stroke="#FFFFFF" stroke-width="4" />
+      <line x1="210" y1="347" x2="207" y2="379" stroke="#FFFFFF" stroke-width="5" />
+      <line x1="194" y1="400" x2="190" y2="442" stroke="#FFFFFF" stroke-width="6.5" />
+
+      <!-- Right Fence Posts & Rails -->
+      <!-- Rails -->
+      <path d="M268 246 L317 460" stroke="#FFFFFF" stroke-width="3.5" fill="none" opacity="0.95" />
+      <path d="M269 252 L324 460" stroke="#E2E8F0" stroke-width="4.5" fill="none" opacity="0.9" />
+      <!-- Posts Right -->
+      <line x1="268" y1="243" x2="268" y2="252" stroke="#FFFFFF" stroke-width="2" />
+      <line x1="273" y1="256" x2="274" y2="270" stroke="#FFFFFF" stroke-width="2.5" />
+      <line x1="280" y1="277" x2="281" y2="296" stroke="#FFFFFF" stroke-width="3" />
+      <line x1="289" y1="307" x2="291" y2="332" stroke="#FFFFFF" stroke-width="4" />
+      <line x1="302" y1="347" x2="305" y2="379" stroke="#FFFFFF" stroke-width="5" />
+      <line x1="318" y1="400" x2="322" y2="442" stroke="#FFFFFF" stroke-width="6.5" />
+
+      <!-- 5. Destination Safe Haven / Home -->
+      <g filter="url(#softShadow)">
+        <!-- House Base (Crisp White/Slate) -->
+        <rect x="220" y="224" width="72" height="26" rx="2" fill="#F8FAFC" />
+        <rect x="238" y="212" width="36" height="38" fill="#FFFFFF" />
+
+        <!-- Red Roof (Central Gable + Side Wings) -->
+        <!-- Center Roof -->
+        <polygon points="256,192 232,216 280,216" fill="url(#roofGrad)" />
+        <!-- Left Wing Roof -->
+        <polygon points="234,216 214,226 238,226" fill="#DC2626" />
+        <!-- Right Wing Roof -->
+        <polygon points="278,216 298,226 274,226" fill="#B91C1C" />
+
+        <!-- Cupolas / Watchtowers (Rakshak Watchtowers from drawing) -->
+        <rect x="240" y="180" width="8" height="14" fill="#F8FAFC" />
+        <polygon points="244,170 238,180 250,180" fill="#DC2626" />
+        <rect x="264" y="180" width="8" height="14" fill="#F8FAFC" />
+        <polygon points="268,170 262,180 274,180" fill="#DC2626" />
+
+        <!-- Warm Welcoming Safe Doorway -->
+        <rect x="250" y="234" width="12" height="16" rx="6" fill="url(#doorLight)" />
+        <!-- Windows with subtle lights -->
+        <rect x="226" y="230" width="6" height="8" rx="1" fill="#FEF08A" opacity="0.9" />
+        <rect x="280" y="230" width="6" height="8" rx="1" fill="#FEF08A" opacity="0.9" />
+      </g>
+
+      <!-- 6. Bottom Protective Badge Trim (Subtle Shield Contour) -->
+      <path d="M200 460 Q256 470 312 460" stroke="#10B981" stroke-width="3" fill="none" opacity="0.8" />
+    </g>
+  </g>
+
+  <!-- Modern App Icon Inner Glass Border Highlight -->
+  <rect x="8" y="8" width="496" height="496" rx="108" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2" />
+</svg>
